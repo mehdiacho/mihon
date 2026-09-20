@@ -384,6 +384,17 @@ class Downloader(
             // Do after download completes
 
             if (!isDownloadSuccessful(download, tmpDir)) {
+                // The only failure in this function that produced neither a log
+                // line nor a notification: the chapter row showed an error and
+                // nothing anywhere said why. It is also the branch a resumed
+                // download lands in after the process was killed mid-chapter,
+                // so it is worth saying what did not add up.
+                logcat(LogPriority.ERROR) {
+                    val failed = download.pages.orEmpty().count { it.status is Page.State.Error }
+                    "Download of ${download.chapter.name} incomplete: " +
+                        "${download.downloadedImages}/${download.pages?.size} pages ready, " +
+                        "$failed failed, ${tmpDir.listFiles().orEmpty().size} files in ${tmpDir.name}"
+                }
                 download.status = Download.State.ERROR
                 return
             }
@@ -546,13 +557,23 @@ class Downloader(
 
         try {
             val filenamePrefix = "%03d".format(Locale.ENGLISH, page.number)
-            val imageFile = tmpDir.listFiles()?.firstOrNull { it.name.orEmpty().startsWith(filenamePrefix) }
-                ?: error(context.stringResource(MR.strings.download_notifier_split_page_not_found, page.number))
+            val files = tmpDir.listFiles().orEmpty().filter { it.name.orEmpty().startsWith(filenamePrefix) }
+            if (files.isEmpty()) {
+                error(context.stringResource(MR.strings.download_notifier_split_page_not_found, page.number))
+            }
 
-            // If the original page was previously split, then skip
-            if (imageFile.name.orEmpty().startsWith("${filenamePrefix}__")) return
+            // The unsplit page, if it is still here. splitTallImage deletes the
+            // original as its last step, so the original still being present
+            // means a previous split did not finish -- the process was killed
+            // part way through, say -- and the parts beside it cannot be
+            // trusted. Deciding "already split" from the presence of a part, as
+            // this did before, leaves the original sitting next to them; the
+            // page is then counted twice by isDownloadSuccessful and the
+            // chapter fails forever with every one of its pages downloaded.
+            val original = files.firstOrNull { !it.name.orEmpty().startsWith("${filenamePrefix}__") }
+                ?: return
 
-            ImageUtil.splitTallImage(tmpDir, imageFile, filenamePrefix)
+            ImageUtil.splitTallImage(tmpDir, original, filenamePrefix)
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "Failed to split downloaded image" }
         }
