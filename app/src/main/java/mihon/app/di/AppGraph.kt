@@ -43,6 +43,14 @@ import eu.kanade.tachiyomi.util.CrashLogUtil
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
 import mihon.core.metro.IsDebugBuild
+import mihon.data.remote.MirrorExistingDownloads
+import mihon.data.remote.RemoteClientProvider
+import mihon.data.remote.RemoteHealth
+import mihon.data.remote.RemoteIndex
+import mihon.data.remote.RemoteMaintenanceJob
+import mihon.data.remote.RemoteMirror
+import mihon.data.remote.RemoteStoragePreferences
+import mihon.data.remote.RemoteUploadJob
 import mihon.domain.extension.interactor.GetExtensionStoreCountAsFlow
 import nl.adaptivity.xmlutil.serialization.XML
 import tachiyomi.domain.backup.service.BackupPreferences
@@ -72,6 +80,8 @@ interface AppGraph : ViewModelGraph {
     fun inject(backupCreateJob: BackupCreateJob)
     fun inject(delayedTrackingUpdateJob: DelayedTrackingUpdateJob)
     fun inject(downloadJob: DownloadJob)
+    fun inject(remoteUploadJob: RemoteUploadJob)
+    fun inject(remoteMaintenanceJob: RemoteMaintenanceJob)
     fun inject(notificationReceiver: NotificationReceiver)
     fun inject(notificationReceiver: SecureActivityDelegateImpl)
     fun inject(extensionInstallActivity: ExtensionInstallActivity)
@@ -92,6 +102,12 @@ interface AppGraph : ViewModelGraph {
     val privacyPreferences: PrivacyPreferences
     val securityPreferences: SecurityPreferences
     val downloadPreferences: DownloadPreferences
+    val remoteStoragePreferences: RemoteStoragePreferences
+    val remoteMirror: RemoteMirror
+    val remoteIndex: RemoteIndex
+    val remoteClientProvider: RemoteClientProvider
+    val remoteHealth: RemoteHealth
+    val mirrorExistingDownloads: MirrorExistingDownloads
 
     val crashLogUtil: CrashLogUtil
 

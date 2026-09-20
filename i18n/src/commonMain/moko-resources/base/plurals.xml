@@ -114,4 +114,8 @@
         <item quantity="one">%1$d update failed</item>
         <item quantity="other">%1$d updates failed</item>
     </plurals>
+    <plurals name="pref_remote_storage_evict_days_summary">
+        <item quantity="one">Local copies are removed %d day after they reach the server</item>
+        <item quantity="other">Local copies are removed %d days after they reach the server</item>
+    </plurals>
 </resources>
