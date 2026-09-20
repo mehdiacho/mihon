@@ -3,8 +3,11 @@ package eu.kanade.presentation.manga.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -32,6 +35,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.model.Download
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.ArrowDownward
+import mihon.icons.materialsymbols.rounded.Cloud
 import mihon.icons.materialsymbols.rounded.Error
 import mihon.icons.materialsymbols.roundedfilled.CheckCircle
 import tachiyomi.i18n.MR
@@ -44,8 +48,27 @@ enum class ChapterDownloadAction {
     START_NOW,
     CANCEL,
     DELETE,
+    DELETE_REMOTE,
+    KEEP_ON_DEVICE,
+    ALLOW_REMOVAL,
 }
 
+/**
+ * The chapter's download control, optionally preceded by a cloud badge saying
+ * the configured remote server holds a copy.
+ *
+ * The two are deliberately separate icons rather than one combined symbol. The
+ * download control keeps exactly the meaning it has always had -- an arrow
+ * means "not on this device, tap to get it", a check means "on this device" --
+ * so a chapter that lives only on the server still shows the arrow the user
+ * already knows how to tap. The cloud answers a different question, and it is
+ * additional information rather than a replacement for the answer to the first.
+ *
+ * @param isOnRemote whether the server is known to hold this chapter.
+ * @param isKeptOnDevice true or false when the eviction policy could remove
+ * this chapter and the user has or has not pinned it; null when nothing would
+ * evict it anyway, in which case pinning is not offered.
+ */
 @Composable
 fun ChapterDownloadIndicator(
     enabled: Boolean,
@@ -53,41 +76,116 @@ fun ChapterDownloadIndicator(
     downloadProgressProvider: () -> Int,
     onClick: (ChapterDownloadAction) -> Unit,
     modifier: Modifier = Modifier,
+    isOnRemote: Boolean = false,
+    isKeptOnDevice: Boolean? = null,
 ) {
-    when (val downloadState = downloadStateProvider()) {
-        Download.State.NOT_DOWNLOADED -> NotDownloadedIndicator(
-            enabled = enabled,
-            modifier = modifier,
-            onClick = onClick,
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (isOnRemote) {
+            RemoteCopyBadge(
+                enabled = enabled,
+                isKeptOnDevice = isKeptOnDevice,
+                onClick = onClick,
+            )
+        }
+        when (val downloadState = downloadStateProvider()) {
+            Download.State.NOT_DOWNLOADED -> NotDownloadedIndicator(
+                enabled = enabled,
+                onClick = onClick,
+            )
+            Download.State.QUEUE, Download.State.DOWNLOADING -> DownloadingIndicator(
+                enabled = enabled,
+                downloadState = downloadState,
+                downloadProgressProvider = downloadProgressProvider,
+                onClick = onClick,
+            )
+            Download.State.DOWNLOADED -> DownloadedIndicator(
+                enabled = enabled,
+                onClick = onClick,
+            )
+            Download.State.ERROR -> ErrorIndicator(
+                enabled = enabled,
+                onClick = onClick,
+            )
+        }
+    }
+}
+
+/**
+ * Sits to the left of the download control and means one thing: the server has
+ * this chapter. Narrower than the control it sits beside but the same height,
+ * so a column of chapter rows still lines up.
+ */
+@Composable
+private fun RemoteCopyBadge(
+    enabled: Boolean,
+    isKeptOnDevice: Boolean?,
+    onClick: (ChapterDownloadAction) -> Unit,
+) {
+    var isMenuExpanded by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .width(RemoteBadgeWidth)
+            .height(IconButtonTokens.StateLayerSize)
+            .commonClickable(
+                enabled = enabled,
+                hapticFeedback = LocalHapticFeedback.current,
+                onLongClick = { isMenuExpanded = true },
+                onClick = { isMenuExpanded = true },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = MaterialSymbols.Rounded.Cloud,
+            contentDescription = stringResource(MR.strings.remote_storage_chapter_on_server),
+            modifier = Modifier.size(RemoteBadgeIconSize),
+            // The one coloured icon in the row. Everything else here is
+            // onSurfaceVariant, so tinting the cloud with the scheme's accent
+            // separates "where this chapter is" from "what tapping does" at a
+            // glance, and follows the user's theme rather than hard-coding a
+            // colour that would clash with half of them. Not secondary alpha,
+            // for the same reason: a muted accent reads as disabled.
+            tint = MaterialTheme.colorScheme.tertiary,
         )
-        Download.State.QUEUE, Download.State.DOWNLOADING -> DownloadingIndicator(
-            enabled = enabled,
-            modifier = modifier,
-            downloadState = downloadState,
-            downloadProgressProvider = downloadProgressProvider,
-            onClick = onClick,
-        )
-        Download.State.DOWNLOADED -> DownloadedIndicator(
-            enabled = enabled,
-            modifier = modifier,
-            onClick = onClick,
-        )
-        Download.State.ERROR -> ErrorIndicator(
-            enabled = enabled,
-            modifier = modifier,
-            onClick = onClick,
-        )
+        DropdownMenu(expanded = isMenuExpanded, onDismissRequest = { isMenuExpanded = false }) {
+            if (isKeptOnDevice == false) {
+                DropdownMenuItem(
+                    text = { Text(text = stringResource(MR.strings.action_keep_on_device)) },
+                    onClick = {
+                        onClick(ChapterDownloadAction.KEEP_ON_DEVICE)
+                        isMenuExpanded = false
+                    },
+                )
+            }
+            if (isKeptOnDevice == true) {
+                DropdownMenuItem(
+                    text = { Text(text = stringResource(MR.strings.action_allow_removal)) },
+                    onClick = {
+                        onClick(ChapterDownloadAction.ALLOW_REMOVAL)
+                        isMenuExpanded = false
+                    },
+                )
+            }
+            DropdownMenuItem(
+                text = { Text(text = stringResource(MR.strings.action_delete_remote_copy)) },
+                onClick = {
+                    onClick(ChapterDownloadAction.DELETE_REMOTE)
+                    isMenuExpanded = false
+                },
+            )
+        }
     }
 }
 
 @Composable
 private fun NotDownloadedIndicator(
     enabled: Boolean,
-    modifier: Modifier = Modifier,
     onClick: (ChapterDownloadAction) -> Unit,
 ) {
     Box(
-        modifier = modifier
+        modifier = Modifier
             .size(IconButtonTokens.StateLayerSize)
             .commonClickable(
                 enabled = enabled,
@@ -113,11 +211,10 @@ private fun DownloadingIndicator(
     downloadState: Download.State,
     downloadProgressProvider: () -> Int,
     onClick: (ChapterDownloadAction) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
     Box(
-        modifier = modifier
+        modifier = Modifier
             .size(IconButtonTokens.StateLayerSize)
             .commonClickable(
                 enabled = enabled,
@@ -190,12 +287,11 @@ private fun DownloadingIndicator(
 @Composable
 private fun DownloadedIndicator(
     enabled: Boolean,
-    modifier: Modifier = Modifier,
     onClick: (ChapterDownloadAction) -> Unit,
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
     Box(
-        modifier = modifier
+        modifier = Modifier
             .size(IconButtonTokens.StateLayerSize)
             .commonClickable(
                 enabled = enabled,
@@ -226,11 +322,10 @@ private fun DownloadedIndicator(
 @Composable
 private fun ErrorIndicator(
     enabled: Boolean,
-    modifier: Modifier = Modifier,
     onClick: (ChapterDownloadAction) -> Unit,
 ) {
     Box(
-        modifier = modifier
+        modifier = Modifier
             .size(IconButtonTokens.StateLayerSize)
             .commonClickable(
                 enabled = enabled,
@@ -270,6 +365,8 @@ private fun Modifier.commonClickable(
 )
 
 private val IndicatorSize = 26.dp
+private val RemoteBadgeWidth = 28.dp
+private val RemoteBadgeIconSize = 22.dp
 private val IndicatorPadding = 2.dp
 
 // To match composable parameter name when used later

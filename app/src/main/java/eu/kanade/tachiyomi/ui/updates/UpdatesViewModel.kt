@@ -263,6 +263,14 @@ class UpdatesViewModel(
                 ChapterDownloadAction.DELETE -> {
                     deleteChapters(items)
                 }
+                // Only the manga screen shows the remote badge, so these
+                // cannot be reached from here. Falling through to a local
+                // delete would be worse than doing nothing: "delete the server
+                // copy" must never remove the copy on the device.
+                ChapterDownloadAction.DELETE_REMOTE,
+                ChapterDownloadAction.KEEP_ON_DEVICE,
+                ChapterDownloadAction.ALLOW_REMOVAL,
+                -> Unit
             }
             toggleAllSelection(false)
         }
