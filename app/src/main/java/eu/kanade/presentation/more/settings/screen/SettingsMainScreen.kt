@@ -34,6 +34,7 @@ import eu.kanade.presentation.util.LocalBackPress
 import eu.kanade.presentation.util.Screen
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.automirroredrounded.ChromeReaderMode
+import mihon.icons.materialsymbols.rounded.CloudUpload
 import mihon.icons.materialsymbols.rounded.Code
 import mihon.icons.materialsymbols.rounded.CollectionsBookmark
 import mihon.icons.materialsymbols.rounded.Download
@@ -194,6 +195,12 @@ object SettingsMainScreen : Screen() {
             subtitleRes = MR.strings.pref_downloads_summary,
             icon = MaterialSymbols.Rounded.Download,
             screen = SettingsDownloadScreen,
+        ),
+        Item(
+            titleRes = MR.strings.pref_category_remote_storage,
+            subtitleRes = MR.strings.pref_remote_storage_summary,
+            icon = MaterialSymbols.Rounded.CloudUpload,
+            screen = SettingsRemoteStorageScreen,
         ),
         Item(
             titleRes = MR.strings.pref_category_tracking,
