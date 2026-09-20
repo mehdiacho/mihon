@@ -43,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import logcat.LogPriority
 import mihon.core.archive.ZipWriter
+import mihon.data.remote.RemoteMirror
 import nl.adaptivity.xmlutil.serialization.XML
 import okhttp3.Response
 import tachiyomi.core.common.i18n.stringResource
@@ -83,6 +84,7 @@ class Downloader(
     private val getTracks: GetTracks,
     private val store: DownloadStore,
     private val notifier: DownloadNotifier,
+    private val remoteMirror: RemoteMirror,
 ) {
     /**
      * Queue where active downloads are kept.
@@ -339,6 +341,15 @@ class Downloader(
             download.chapter.scanlator,
             download.chapter.url,
         )
+
+        // A chapter that is already on the server does not need to be pulled
+        // from the source again: the archive is identical, the LAN is faster,
+        // and it spares the scanlation site a download it has already served.
+        if (restoreFromRemote(download, mangaDir, chapterDirname)) {
+            download.status = Download.State.DOWNLOADED
+            return
+        }
+
         val tmpDir = mangaDir.createDirectory(chapterDirname + TMP_DIR_SUFFIX)!!
 
         try {
@@ -413,6 +424,14 @@ class Downloader(
                 tmpDir.renameTo(chapterDirname)
             }
             cache.addChapter(chapterDirname, mangaDir, download.manga)
+
+            // Hand the finished archive to the remote mirror. Fire-and-forget:
+            // the download is complete and correct whether or not it uploads.
+            // Only the CBZ path is mirrored -- a loose page directory is not a
+            // single file and is not what the remote is for.
+            if (downloadPreferences.saveChaptersAsCBZ.get()) {
+                mirrorChapter(mangaDir, chapterDirname, download)
+            }
 
             DiskUtil.createNoMediaFile(tmpDir, context)
 
@@ -622,6 +641,68 @@ class Downloader(
             fileName.startsWith("$pagePrefix.") ||
                 fileName.startsWith("${pagePrefix}__001.")
             )
+
+    /**
+     * Copies the chapter back from the remote instead of downloading it, when
+     * the user has asked for that and the remote actually has it.
+     *
+     * Returns false for every other case, including failure, so the caller
+     * falls through to an ordinary download. A remote that is unreachable must
+     * degrade to the normal path, not to an error.
+     */
+    private suspend fun restoreFromRemote(download: Download, mangaDir: UniFile, chapterDirname: String): Boolean {
+        if (!remoteMirror.isEnabled || !remoteMirror.redownloadFromRemote) return false
+
+        return try {
+            val fileName = RemoteMirror.chapterFileName(chapterDirname)
+            val segments = remoteMirror.segmentsFor(
+                sourceDirName = provider.getSourceDirName(download.source),
+                mangaDirName = provider.getMangaDirName(download.manga.title),
+                chapterFileName = fileName,
+            )
+
+            val fetched = remoteMirror.fetch(segments) ?: return false
+
+            // Copied rather than moved: the fetch cache is shared with the
+            // reader, and moving it out from under a chapter being read would
+            // break it.
+            val target = mangaDir.createFile(fileName) ?: return false
+            fetched.inputStream().use { input ->
+                target.openOutputStream().use { output -> input.copyTo(output) }
+            }
+
+            cache.addChapter(chapterDirname, mangaDir, download.manga)
+            true
+        } catch (e: Throwable) {
+            logcat(LogPriority.WARN, e) { "Could not restore ${download.chapter.name} from remote" }
+            false
+        }
+    }
+
+    /**
+     * Queues the finished CBZ for upload to the remote mirror, if one is
+     * configured. Never throws: a mirroring problem must not turn a successful
+     * download into a failed one.
+     */
+    private fun mirrorChapter(mangaDir: UniFile, chapterDirname: String, download: Download) {
+        if (!remoteMirror.isEnabled) return
+        try {
+            val fileName = RemoteMirror.chapterFileName(chapterDirname)
+            val archive = mangaDir.findFile(fileName) ?: return
+            remoteMirror.enqueue(
+                file = archive,
+                segments = remoteMirror.segmentsFor(
+                    sourceDirName = provider.getSourceDirName(download.source),
+                    mangaDirName = provider.getMangaDirName(download.manga.title),
+                    chapterFileName = fileName,
+                ),
+                chapterId = download.chapter.id,
+                mangaId = download.manga.id,
+            )
+        } catch (e: Throwable) {
+            logcat(LogPriority.ERROR, e) { "Failed to queue chapter for remote mirror" }
+        }
+    }
 
     /**
      * Archive the chapter pages as a CBZ.

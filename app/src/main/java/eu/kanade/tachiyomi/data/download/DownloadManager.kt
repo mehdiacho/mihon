@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.runBlocking
 import logcat.LogPriority
+import mihon.data.remote.RemoteMirror
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.storage.extension
 import tachiyomi.core.common.util.lang.launchIO
@@ -50,6 +51,7 @@ class DownloadManager(
     private val downloadPreferences: DownloadPreferences,
     private val downloader: Downloader,
     private val pendingDeleter: DownloadPendingDeleter,
+    private val remoteMirror: RemoteMirror,
 ) {
 
     val isRunning: Boolean
@@ -257,6 +259,13 @@ class DownloadManager(
             chapterDirs.forEach { it.delete() }
             cache.removeChapters(filteredChapters, manga)
 
+            // Only when the remote is configured as a mirror of the device. An
+            // archive keeps what it has been given; that is the whole
+            // difference between the two roles.
+            if (remoteMirror.deletesPropagate) {
+                deleteRemoteChapters(filteredChapters, manga, source)
+            }
+
             // Delete manga directory if empty
             if (mangaDir?.listFiles()?.isEmpty() == true) {
                 deleteManga(manga, source, removeQueued = false)
@@ -286,6 +295,71 @@ class DownloadManager(
                 cache.removeSource(source)
             }
         }
+    }
+
+    /**
+     * Deletes the remote copies of [chapters], regardless of the mirror/archive
+     * role. This is the explicit "delete remote copy" action, as opposed to the
+     * propagation that [deleteChapters] may do on its own.
+     */
+    fun deleteRemoteChapters(chapters: List<Chapter>, manga: Manga, source: Source) {
+        if (!remoteMirror.isEnabled) return
+        val sourceDirName = provider.getSourceDirName(source)
+        val mangaDirName = provider.getMangaDirName(manga.title)
+        chapters.forEach { chapter ->
+            val fileName = RemoteMirror.chapterFileName(
+                provider.getChapterDirName(chapter.name, chapter.scanlator, chapter.url),
+            )
+            remoteMirror.deleteRemote(remoteMirror.segmentsFor(sourceDirName, mangaDirName, fileName))
+        }
+    }
+
+    /** Whether the remote is known to hold this chapter. */
+    fun isChapterOnRemote(chapter: Chapter, manga: Manga, source: Source): Boolean {
+        if (!remoteMirror.isEnabled) return false
+        return remoteMirror.holds(remoteSegments(chapter, manga, source))
+    }
+
+    /**
+     * Whether this chapter is exempt from automatic eviction.
+     *
+     * Null means the question does not arise -- nothing is set to remove local
+     * copies -- so the UI can leave the option out rather than offering a pin
+     * against a policy that does not exist.
+     */
+    fun isChapterKeptOnDevice(chapter: Chapter, manga: Manga, source: Source): Boolean? {
+        if (!remoteMirror.isEnabled || !remoteMirror.evictsLocalCopies) return null
+        return remoteMirror.isKept(remoteSegments(chapter, manga, source))
+    }
+
+    fun keepChaptersOnDevice(chapters: List<Chapter>, manga: Manga, source: Source) {
+        if (!remoteMirror.isEnabled) return
+        chapters.forEach { remoteMirror.keep(remoteSegments(it, manga, source)) }
+    }
+
+    fun allowChapterRemoval(chapters: List<Chapter>, manga: Manga, source: Source) {
+        if (!remoteMirror.isEnabled) return
+        chapters.forEach { remoteMirror.release(remoteSegments(it, manga, source)) }
+    }
+
+    /**
+     * Records that the user asked for these chapters by hand, so the configured
+     * manual-download policy can spare them from eviction.
+     */
+    fun onManualDownload(chapters: List<Chapter>, manga: Manga, source: Source) {
+        if (!remoteMirror.isEnabled) return
+        chapters.forEach { remoteMirror.onManualDownload(remoteSegments(it, manga, source)) }
+    }
+
+    private fun remoteSegments(chapter: Chapter, manga: Manga, source: Source): List<String> {
+        val fileName = RemoteMirror.chapterFileName(
+            provider.getChapterDirName(chapter.name, chapter.scanlator, chapter.url),
+        )
+        return remoteMirror.segmentsFor(
+            provider.getSourceDirName(source),
+            provider.getMangaDirName(manga.title),
+            fileName,
+        )
     }
 
     private fun removeFromDownloadQueue(chapters: List<Chapter>) {
@@ -379,6 +453,9 @@ class DownloadManager(
 
         if (oldFolder.renameTo(newName)) {
             cache.renameManga(manga, oldFolder, newTitle)
+            // Otherwise the remote copy is stranded under the old title and
+            // nothing will ever look for it again.
+            remoteMirror.renameManga(provider.getSourceDirName(source), oldFolder.name.orEmpty(), newName)
         } else {
             logcat(LogPriority.ERROR) { "Failed to rename manga download folder: ${oldFolder.name}" }
         }
