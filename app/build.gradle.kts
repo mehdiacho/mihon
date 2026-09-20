@@ -111,6 +111,27 @@ android {
 
             buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLatestCommitTime = false)}\"")
         }
+        // Personal daily-driver build. Installs alongside upstream stable (app.mihon)
+        // and preview (app.mihon.debug) instead of replacing either, and picks up the
+        // amber launcher icon from src/custom/res. Signed with the local Android debug
+        // key, which is fine because this applicationId has never been installed under
+        // any other key -- see docs/fork.md.
+        create("custom") {
+            initWith(release)
+
+            applicationIdSuffix = ".custom"
+            versionNameSuffix = "-custom-${getLatestCommitCount()}"
+
+            matchingFallbacks.addAll(commonMatchingFallbacks)
+
+            buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLatestCommitTime = false)}\"")
+
+            // Mihon's fork guidelines ask forks to change or disable the update
+            // checker. It already defaults to off, but that is a -P property
+            // anyone could pass by accident, and this build must never offer to
+            // "update" itself to an upstream APK it is not signed with.
+            buildConfigField("boolean", "UPDATER_ENABLED", "false")
+        }
         create("benchmark") {
             initWith(release)
 
@@ -128,10 +149,20 @@ android {
 
     splits {
         abi {
+            // Upstream ships five APKs. Only arm64-v8a is ever installed on the one
+            // device this fork targets, and building the rest (plus the universal APK,
+            // which bundles every ABI) is most of the wall-clock cost of a build.
+            // Pass -PallAbis to restore the full upstream matrix -- needed when
+            // producing artifacts for an upstream PR, not for day-to-day builds.
+            val allAbis = project.hasProperty("allAbis")
             isEnable = true
-            isUniversalApk = true
+            isUniversalApk = allAbis
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            if (allAbis) {
+                include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            } else {
+                include("arm64-v8a")
+            }
         }
     }
 

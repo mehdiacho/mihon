@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Amber-on-charcoal, so this build is distinguishable at a glance from
+         stable (dark blue on white) and preview (light blue on slate). -->
+    <color name="accent_blue">#F5A524</color>
+    <color name="icon_background">#1C1B1F</color>
+</resources>
