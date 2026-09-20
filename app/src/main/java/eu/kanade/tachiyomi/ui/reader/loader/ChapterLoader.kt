@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.ui.reader.loader
 
 import android.content.Context
+import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.data.cache.ChapterCache
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.DownloadProvider
@@ -9,6 +10,7 @@ import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.reader.model.ReaderChapter
 import mihon.core.archive.archiveReader
 import mihon.core.archive.epubReader
+import mihon.data.remote.RemoteMirror
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
@@ -28,6 +30,7 @@ class ChapterLoader(
     private val chapterCache: ChapterCache,
     private val manga: Manga,
     private val source: Source,
+    private val remoteMirror: RemoteMirror,
 ) {
 
     /**
@@ -86,6 +89,7 @@ class ChapterLoader(
             manga.title,
             source,
         )
+        val mirrored = if (isDownloaded) null else fetchFromMirror(chapter)
         return when {
             isDownloaded -> DownloadPageLoader(
                 chapter,
@@ -94,6 +98,10 @@ class ChapterLoader(
                 downloadManager,
                 downloadProvider,
             )
+            // A chapter that was evicted after being mirrored is still a
+            // downloaded chapter as far as the reader is concerned; it just
+            // lives on the server until it is opened.
+            mirrored != null -> ArchivePageLoader(mirrored.archiveReader(context))
             source is LocalSource -> source.getFormat(chapter.chapter).let { format ->
                 when (format) {
                     is Format.Directory -> DirectoryPageLoader(format.file)
@@ -105,5 +113,33 @@ class ChapterLoader(
             source is StubSource -> error(context.stringResource(MR.strings.source_not_installed, source.toString()))
             else -> error(context.stringResource(MR.strings.loader_not_implemented_error))
         }
+    }
+
+    /**
+     * Pulls [chapter] back from the remote mirror if it is held there. Returns
+     * null when mirroring is off, the path cannot be built, or the server does
+     * not have the file -- in every one of those cases the caller falls through
+     * to the normal online loader.
+     */
+    private fun fetchFromMirror(chapter: ReaderChapter): UniFile? {
+        if (!remoteMirror.isEnabled) return null
+
+        val segments = segmentsFor(chapter) ?: return null
+        val file = remoteMirror.fetch(segments) ?: return null
+
+        return UniFile.fromFile(file)
+    }
+
+    private fun segmentsFor(chapter: ReaderChapter): List<String>? {
+        val dbChapter = chapter.chapter
+        return runCatching {
+            remoteMirror.segmentsFor(
+                sourceDirName = downloadProvider.getSourceDirName(source),
+                mangaDirName = downloadProvider.getMangaDirName(manga.title),
+                chapterFileName = RemoteMirror.chapterFileName(
+                    downloadProvider.getChapterDirName(dbChapter.name, dbChapter.scanlator, dbChapter.url),
+                ),
+            )
+        }.getOrNull()
     }
 }
