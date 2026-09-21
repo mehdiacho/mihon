@@ -496,12 +496,13 @@ class LibraryViewModel(
             DownloadAction.NEXT_10_CHAPTERS -> downloadNextChapters(10)
             DownloadAction.NEXT_25_CHAPTERS -> downloadNextChapters(25)
             DownloadAction.UNREAD_CHAPTERS -> downloadNextChapters(null)
+            DownloadAction.UNREAD_NOT_ON_SERVER -> downloadNextChapters(null, skipOnRemote = true)
             DownloadAction.BOOKMARKED_CHAPTERS -> downloadBookmarkedChapters()
         }
         clearSelection()
     }
 
-    private fun downloadNextChapters(amount: Int?) {
+    private fun downloadNextChapters(amount: Int?, skipOnRemote: Boolean = false) {
         val mangas = selectedManga
         viewModelScope.launchNonCancellable {
             mangas.forEach { manga ->
@@ -515,6 +516,12 @@ class LibraryViewModel(
                                 manga.title,
                                 manga.source,
                             )
+                    }
+                    // After the local filter, so the server is asked about at
+                    // most one series per selected manga rather than per chapter.
+                    .let {
+                        if (!skipOnRemote) return@let it
+                        downloadManager.filterNotOnRemote(it, manga, sourceManager.getOrStub(manga.source))
                     }
                     .let { if (amount != null) it.take(amount) else it }
 

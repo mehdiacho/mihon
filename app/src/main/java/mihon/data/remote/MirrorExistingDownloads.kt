@@ -31,6 +31,7 @@ class MirrorExistingDownloads(
     private val clientProvider: RemoteClientProvider,
     private val mirror: RemoteMirror,
     private val index: RemoteIndex,
+    private val maintenance: RemoteMaintenance,
 ) {
 
     private val _state = MutableStateFlow<State>(State.Idle)
@@ -49,7 +50,7 @@ class MirrorExistingDownloads(
             val current: String,
         ) : State
 
-        data class Done(val uploaded: Int, val skipped: Int, val failed: Int) : State
+        data class Done(val uploaded: Int, val skipped: Int, val failed: Int, val freedBytes: Long) : State
     }
 
     /**
@@ -96,6 +97,7 @@ class MirrorExistingDownloads(
         var uploaded = 0
         var skipped = 0
         var failed = 0
+        var freed = 0L
 
         // One listing per manga directory, rather than one HEAD per chapter.
         // Over a library of several thousand chapters that is the difference
@@ -136,13 +138,21 @@ class MirrorExistingDownloads(
                 }
             }
 
+            // Reclaim as each series finishes rather than at the end, so the
+            // peak local footprint is one series instead of the whole library.
+            // A no-op unless the user asked for local copies to be removed.
+            val nextDirKey = candidates.getOrNull(i + 1)?.let { "${it.segments[0]}/${it.segments[1]}" }
+            if (nextDirKey != dirKey) {
+                freed += maintenance.reclaimSeries(source, manga).freedBytes
+            }
+
             if (i == candidates.lastIndex) {
-                _state.value = State.Done(uploaded, skipped, failed)
+                _state.value = State.Done(uploaded, skipped, failed, freed)
             }
         }
 
         if (candidates.isEmpty()) {
-            _state.value = State.Done(0, 0, 0)
+            _state.value = State.Done(0, 0, 0, 0L)
         }
     }
 

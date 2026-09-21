@@ -48,6 +48,7 @@ import mihon.data.remote.RemoteClientProvider
 import mihon.data.remote.RemoteHealth
 import mihon.data.remote.RemoteIndex
 import mihon.data.remote.RemoteIndexSweep
+import mihon.data.remote.RemoteMaintenance
 import mihon.data.remote.RemoteMaintenanceJob
 import mihon.data.remote.RemoteMirror
 import mihon.data.remote.RemoteStoragePreferences
@@ -110,6 +111,7 @@ interface AppGraph : ViewModelGraph {
     val remoteHealth: RemoteHealth
     val mirrorExistingDownloads: MirrorExistingDownloads
     val remoteIndexSweep: RemoteIndexSweep
+    val remoteMaintenance: RemoteMaintenance
 
     val crashLogUtil: CrashLogUtil
 

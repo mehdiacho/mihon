@@ -792,16 +792,38 @@ class MangaViewModel(
     }
 
     fun runDownloadAction(action: DownloadAction) {
+        // Its own branch because it has to ask the server, and everything else
+        // here is answered from state already in hand.
+        if (action == DownloadAction.UNREAD_NOT_ON_SERVER) {
+            downloadUnreadNotOnServer()
+            return
+        }
+
         val chaptersToDownload = when (action) {
             DownloadAction.NEXT_1_CHAPTER -> getUnreadChaptersSorted().take(1)
             DownloadAction.NEXT_5_CHAPTERS -> getUnreadChaptersSorted().take(5)
             DownloadAction.NEXT_10_CHAPTERS -> getUnreadChaptersSorted().take(10)
             DownloadAction.NEXT_25_CHAPTERS -> getUnreadChaptersSorted().take(25)
             DownloadAction.UNREAD_CHAPTERS -> getUnreadChapters()
+            DownloadAction.UNREAD_NOT_ON_SERVER -> emptyList()
             DownloadAction.BOOKMARKED_CHAPTERS -> getBookmarkedChapters()
         }
         if (chaptersToDownload.isNotEmpty()) {
             startDownload(chaptersToDownload, false)
+        }
+    }
+
+    private fun downloadUnreadNotOnServer() {
+        val manga = successState?.manga ?: return
+        val source = successState?.source ?: return
+        val unread = getUnreadChapters()
+        if (unread.isEmpty()) return
+
+        viewModelScope.launchNonCancellable {
+            val chapters = downloadManager.filterNotOnRemote(unread, manga, source)
+            if (chapters.isNotEmpty()) {
+                startDownload(chapters, false)
+            }
         }
     }
 

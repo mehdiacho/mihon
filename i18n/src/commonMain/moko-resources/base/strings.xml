@@ -798,6 +798,7 @@
     <string name="sort_by_upload_date">By upload date</string>
     <string name="manga_download">Download</string>
     <string name="download_unread">Unread</string>
+    <string name="download_unread_not_on_server">Unread, not on server</string>
     <string name="download_bookmarked">Bookmarked</string>
     <string name="custom_cover">Custom cover</string>
     <string name="manga_cover">Cover</string>
@@ -1154,6 +1155,7 @@
     <string name="pref_remote_storage_mirror_existing_scanning">Scanning… %1$d found</string>
     <string name="pref_remote_storage_mirror_existing_running">%1$d of %2$d · %3$s</string>
     <string name="pref_remote_storage_mirror_existing_done">Done: %1$d uploaded, %2$d already there, %3$d failed</string>
+    <string name="pref_remote_storage_mirror_existing_done_freed">Done: %1$d uploaded, %2$d already there, %3$d failed · %4$s freed</string>
     <string name="pref_remote_storage_pending">%1$d waiting to upload</string>
     <string name="pref_remote_storage_upload_error">Last upload failed: %1$s</string>
     <string name="pref_remote_storage_sweep">Check what the server has</string>
@@ -1161,6 +1163,11 @@
     <string name="pref_remote_storage_sweep_running">%1$d of %2$d · %3$d chapters found</string>
     <string name="pref_remote_storage_sweep_done">%1$d chapters across %2$d series</string>
     <string name="pref_remote_storage_sweep_done_unreachable">%1$d chapters across %2$d series · %3$d could not be checked</string>
+    <string name="pref_remote_storage_reclaim">Free up space now</string>
+    <string name="pref_remote_storage_reclaim_summary">Delete the local copy of every chapter the server is confirmed to hold. Chapters you have kept on this device are left alone, and anything removed is fetched back when you open it.</string>
+    <string name="pref_remote_storage_reclaim_running">Freeing space… %1$s from %2$d chapters</string>
+    <string name="pref_remote_storage_reclaim_done">Freed %1$s from %2$d chapters</string>
+    <string name="pref_remote_storage_reclaim_none">Nothing to free — no local copy is confirmed on the server</string>
     <string name="action_keep_on_device">Keep on this device</string>
     <string name="action_allow_removal">Allow removal from device</string>
     <string name="action_delete_remote_copy">Delete server copy</string>

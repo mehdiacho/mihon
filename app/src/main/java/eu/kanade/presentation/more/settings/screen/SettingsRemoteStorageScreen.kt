@@ -30,6 +30,7 @@ import mihon.app.di.appGraph
 import mihon.data.remote.EvictionTiming
 import mihon.data.remote.ManualDownloadKeep
 import mihon.data.remote.MirrorExistingDownloads
+import mihon.data.remote.RemoteMaintenance
 import mihon.data.remote.RedownloadSource
 import mihon.data.remote.RemoteHealth
 import mihon.data.remote.RemoteIndexSweep
@@ -57,6 +58,7 @@ object SettingsRemoteStorageScreen : SearchableSettings {
         val mirror = remember { context.appGraph.remoteMirror }
         val migrator = remember { context.appGraph.mirrorExistingDownloads }
         val sweep = remember { context.appGraph.remoteIndexSweep }
+        val maintenance = remember { context.appGraph.remoteMaintenance }
 
         val enabled by prefs.enabled.collectAsState()
         val host by prefs.host.collectAsState()
@@ -75,6 +77,7 @@ object SettingsRemoteStorageScreen : SearchableSettings {
         val pending by mirror.pendingUploads.collectAsStateWithLifecycle()
         val migrationState by migrator.state.collectAsStateWithLifecycle()
         val sweepState by sweep.state.collectAsStateWithLifecycle()
+        val reclaimState by maintenance.state.collectAsStateWithLifecycle()
         val uploadError by mirror.lastUploadError.collectAsStateWithLifecycle()
 
         // Check as soon as the screen is opened rather than waiting out the
@@ -285,6 +288,11 @@ object SettingsRemoteStorageScreen : SearchableSettings {
                         subtitle = migrationSubtitle(migrationState),
                         onClick = { scope.launch { migrator.run() } },
                     ),
+                    Preference.PreferenceItem.TextPreference(
+                        title = stringResource(MR.strings.pref_remote_storage_reclaim),
+                        subtitle = reclaimSubtitle(reclaimState),
+                        onClick = { scope.launch { maintenance.reclaimNow() } },
+                    ),
                 ),
             ),
         ) + pendingUploadsInfo(pending, uploadError)
@@ -337,6 +345,35 @@ object SettingsRemoteStorageScreen : SearchableSettings {
     }
 
     @Composable
+    private fun reclaimSubtitle(state: RemoteMaintenance.State): String = when (state) {
+        is RemoteMaintenance.State.Idle ->
+            stringResource(MR.strings.pref_remote_storage_reclaim_summary)
+        is RemoteMaintenance.State.Running ->
+            stringResource(
+                MR.strings.pref_remote_storage_reclaim_running,
+                formatBytes(state.freedBytes),
+                state.evicted,
+            )
+        is RemoteMaintenance.State.Done ->
+            if (state.evicted == 0) {
+                stringResource(MR.strings.pref_remote_storage_reclaim_none)
+            } else {
+                stringResource(
+                    MR.strings.pref_remote_storage_reclaim_done,
+                    formatBytes(state.freedBytes),
+                    state.evicted,
+                )
+            }
+    }
+
+    /** Whole GB or MB. A byte count to three decimal places is not information. */
+    private fun formatBytes(bytes: Long): String = when {
+        bytes >= 1024L * 1024 * 1024 -> "%.1f GB".format(bytes / (1024.0 * 1024 * 1024))
+        bytes >= 1024L * 1024 -> "%d MB".format(bytes / (1024 * 1024))
+        else -> "%d KB".format(bytes / 1024)
+    }
+
+    @Composable
     private fun migrationSubtitle(state: MirrorExistingDownloads.State): String = when (state) {
         is MirrorExistingDownloads.State.Idle ->
             stringResource(MR.strings.pref_remote_storage_mirror_existing_summary)
@@ -350,12 +387,22 @@ object SettingsRemoteStorageScreen : SearchableSettings {
                 state.current,
             )
         is MirrorExistingDownloads.State.Done ->
-            stringResource(
-                MR.strings.pref_remote_storage_mirror_existing_done,
-                state.uploaded,
-                state.skipped,
-                state.failed,
-            )
+            if (state.freedBytes > 0L) {
+                stringResource(
+                    MR.strings.pref_remote_storage_mirror_existing_done_freed,
+                    state.uploaded,
+                    state.skipped,
+                    state.failed,
+                    formatBytes(state.freedBytes),
+                )
+            } else {
+                stringResource(
+                    MR.strings.pref_remote_storage_mirror_existing_done,
+                    state.uploaded,
+                    state.skipped,
+                    state.failed,
+                )
+            }
     }
 
     @Composable

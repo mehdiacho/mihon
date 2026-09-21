@@ -194,6 +194,17 @@ class RemoteMirror(
     val readAheadCount: Int
         get() = preferences.readAheadChapters.get()
 
+    /**
+     * Asks the server what it holds for one series and waits for the answer.
+     *
+     * [holds] is a cache lookup that answers "no" for a series nobody has asked
+     * about yet, which is fine for drawing a badge and wrong for deciding what
+     * to download. Returns false if the server could not be reached, in which
+     * case the cache is all there is.
+     */
+    suspend fun refreshHolds(sourceDirName: String, mangaDirName: String): Boolean =
+        index.refreshNow(sourceDirName, mangaDirName) != null
+
     /** Whether the remote is known to hold this chapter. See [RemoteIndex.contains]. */
     fun holds(segments: List<String>): Boolean {
         if (segments.size < 3) return false
@@ -360,17 +371,23 @@ class RemoteMirror(
 
     /**
      * Removes a local archive and de-registers it. Shared by the immediate path
-     * and the periodic sweep in [RemoteMaintenance].
+     * and the sweeps in [RemoteMaintenance].
+     *
+     * Returns whether the file is gone, so a caller reporting "freed 12 GB" is
+     * reporting what it did rather than what it attempted.
      */
-    suspend fun evictLocalCopy(file: UniFile, chapterId: Long, mangaId: Long) {
+    suspend fun evictLocalCopy(file: UniFile, chapterId: Long, mangaId: Long): Boolean {
         if (!file.delete()) {
             logcat(LogPriority.WARN) { "Could not evict local copy: ${file.name}" }
-            return
+            return false
         }
 
-        val manga = getManga.await(mangaId) ?: return
-        val chapter = getChapter.await(chapterId) ?: return
-        downloadCache.removeChapter(chapter, manga)
+        val manga = getManga.await(mangaId)
+        val chapter = getChapter.await(chapterId)
+        if (manga != null && chapter != null) {
+            downloadCache.removeChapter(chapter, manga)
+        }
+        return true
     }
 
     /**

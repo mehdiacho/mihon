@@ -313,6 +313,25 @@ class DownloadManager(
         }
     }
 
+    /**
+     * Drops the chapters the server already holds.
+     *
+     * Asks the server about the series first: the index is lazily filled, so
+     * without this a library the user has never opened would look entirely
+     * absent from the server and every chapter would download. If the server
+     * cannot be reached the cached index is used as-is, which errs towards
+     * downloading rather than towards silently doing nothing.
+     */
+    suspend fun filterNotOnRemote(chapters: List<Chapter>, manga: Manga, source: Source): List<Chapter> {
+        if (!remoteMirror.isEnabled || chapters.isEmpty()) return chapters
+        val sourceDirName = provider.getSourceDirName(source)
+        val mangaDirName = provider.getMangaDirName(manga.title)
+        if (!remoteMirror.refreshHolds(sourceDirName, mangaDirName)) {
+            logcat(LogPriority.WARN) { "Could not ask the server about ${manga.title}; using what is cached" }
+        }
+        return chapters.filterNot { isChapterOnRemote(it, manga, source) }
+    }
+
     /** Whether the remote is known to hold this chapter. */
     fun isChapterOnRemote(chapter: Chapter, manga: Manga, source: Source): Boolean {
         if (!remoteMirror.isEnabled) return false
