@@ -26,6 +26,18 @@ internal fun DownloadsBadge(count: Int) {
  * merged with it: the two answer different questions, and a series that is
  * entirely on the server and entirely off the device is the normal state once
  * eviction is on.
+ *
+ * The inverse surface pair rather than an accent role, because the accents are
+ * taken. Mihon pins the unread badge to `secondary` and the downloaded badge to
+ * `tertiary`, and most themes then set `primary` to the same value as
+ * `secondary`, so reaching for primary would have reproduced the clash this is
+ * fixing. `tertiaryContainer` is no better -- Nord sets it equal to `tertiary`.
+ * The inverse pair is defined with guaranteed contrast in every theme, dynamic
+ * colour included, and is neutral rather than a third competing accent.
+ *
+ * Monochrome and Yin Yang are two-tone by design and cannot give three distinct
+ * badge colours; there the cloud icon is what tells this badge apart, which is
+ * why it carries one and the other two do not.
  */
 @Composable
 internal fun RemoteBadge(count: Int) {
@@ -33,9 +45,9 @@ internal fun RemoteBadge(count: Int) {
         Badge(
             text = "$count",
             imageVector = MaterialSymbols.Rounded.Cloud,
-            color = MaterialTheme.colorScheme.secondary,
-            textColor = MaterialTheme.colorScheme.onSecondary,
-            iconColor = MaterialTheme.colorScheme.onSecondary,
+            color = MaterialTheme.colorScheme.inverseSurface,
+            textColor = MaterialTheme.colorScheme.inverseOnSurface,
+            iconColor = MaterialTheme.colorScheme.inverseOnSurface,
         )
     }
 }
