@@ -44,6 +44,7 @@ import kotlinx.coroutines.supervisorScope
 import logcat.LogPriority
 import mihon.core.archive.ZipWriter
 import mihon.data.remote.RemoteMirror
+import mihon.data.remote.remoteChapterFileNames
 import nl.adaptivity.xmlutil.serialization.XML
 import okhttp3.Response
 import tachiyomi.core.common.i18n.stringResource
@@ -664,11 +665,11 @@ class Downloader(
         if (!remoteMirror.isEnabled || !remoteMirror.redownloadFromRemote) return false
 
         return try {
-            val fileName = RemoteMirror.chapterFileName(chapterDirname)
+            val chapter = download.chapter
             val segments = remoteMirror.segmentsFor(
                 sourceDirName = provider.getSourceDirName(download.source),
                 mangaDirName = provider.getMangaDirName(download.manga.title),
-                chapterFileName = fileName,
+                chapterFileNames = provider.remoteChapterFileNames(chapter.name, chapter.scanlator, chapter.url),
             )
 
             val fetched = remoteMirror.fetch(segments) ?: return false
@@ -676,7 +677,9 @@ class Downloader(
             // Copied rather than moved: the fetch cache is shared with the
             // reader, and moving it out from under a chapter being read would
             // break it.
-            val target = mangaDir.createFile(fileName) ?: return false
+            // Written under the current name whatever the server called it:
+            // the local tree is what DownloadCache reads.
+            val target = mangaDir.createFile(RemoteMirror.chapterFileName(chapterDirname)) ?: return false
             fetched.inputStream().use { input ->
                 target.openOutputStream().use { output -> input.copyTo(output) }
             }
@@ -697,14 +700,14 @@ class Downloader(
     private fun mirrorChapter(mangaDir: UniFile, chapterDirname: String, download: Download) {
         if (!remoteMirror.isEnabled) return
         try {
-            val fileName = RemoteMirror.chapterFileName(chapterDirname)
-            val archive = mangaDir.findFile(fileName) ?: return
+            val archive = mangaDir.findFile(RemoteMirror.chapterFileName(chapterDirname)) ?: return
+            val chapter = download.chapter
             remoteMirror.enqueue(
                 file = archive,
                 segments = remoteMirror.segmentsFor(
                     sourceDirName = provider.getSourceDirName(download.source),
                     mangaDirName = provider.getMangaDirName(download.manga.title),
-                    chapterFileName = fileName,
+                    chapterFileNames = provider.remoteChapterFileNames(chapter.name, chapter.scanlator, chapter.url),
                 ),
                 chapterId = download.chapter.id,
                 mangaId = download.manga.id,

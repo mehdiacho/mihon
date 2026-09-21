@@ -58,23 +58,31 @@ class RemoteIndex(
     private fun keyOf(sourceDirName: String, mangaDirName: String) = "$sourceDirName/$mangaDirName"
 
     /**
-     * Whether the remote holds [chapterFileName].
+     * The first of [chapterFileNames] the remote holds, or null for none.
      *
-     * Returns false both for "the server does not have it" and for "we have not
-     * looked". The difference matters only to the caller's patience, not to its
-     * correctness, and a lookup that blocked on the network would be worse.
+     * Takes a list because a chapter downloaded before Mihon added the URL hash
+     * to chapter names is on the server under that older name, and the server
+     * keeps whatever it was given.
+     *
+     * Null also covers "we have not looked yet". The difference matters only to
+     * the caller's patience, not to its correctness, and a lookup that blocked
+     * on the network would be worse.
      */
-    fun contains(sourceDirName: String, mangaDirName: String, chapterFileName: String): Boolean {
-        if (!preferences.enabled.get()) return false
+    fun resolve(sourceDirName: String, mangaDirName: String, chapterFileNames: List<String>): String? {
+        if (!preferences.enabled.get()) return null
 
         val key = keyOf(sourceDirName, mangaDirName)
         val known = entries[key]
         if (known == null) {
             refresh(sourceDirName, mangaDirName)
-            return false
+            return null
         }
-        return chapterFileName in known
+        return chapterFileNames.firstOrNull { it in known }
     }
+
+    /** Whether the remote holds the chapter under any of [chapterFileNames]. */
+    fun contains(sourceDirName: String, mangaDirName: String, chapterFileNames: List<String>): Boolean =
+        resolve(sourceDirName, mangaDirName, chapterFileNames) != null
 
     /** How many chapters of this manga the remote holds, or 0 if not yet known. */
     fun countFor(sourceDirName: String, mangaDirName: String): Int {

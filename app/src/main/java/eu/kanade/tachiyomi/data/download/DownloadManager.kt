@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.runBlocking
 import logcat.LogPriority
 import mihon.data.remote.RemoteMirror
+import mihon.data.remote.remoteChapterFileNames
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.storage.extension
 import tachiyomi.core.common.util.lang.launchIO
@@ -307,10 +308,8 @@ class DownloadManager(
         val sourceDirName = provider.getSourceDirName(source)
         val mangaDirName = provider.getMangaDirName(manga.title)
         chapters.forEach { chapter ->
-            val fileName = RemoteMirror.chapterFileName(
-                provider.getChapterDirName(chapter.name, chapter.scanlator, chapter.url),
-            )
-            remoteMirror.deleteRemote(remoteMirror.segmentsFor(sourceDirName, mangaDirName, fileName))
+            val fileNames = provider.remoteChapterFileNames(chapter.name, chapter.scanlator, chapter.url)
+            remoteMirror.deleteRemote(remoteMirror.segmentsFor(sourceDirName, mangaDirName, fileNames))
         }
     }
 
@@ -352,13 +351,10 @@ class DownloadManager(
     }
 
     private fun remoteSegments(chapter: Chapter, manga: Manga, source: Source): List<String> {
-        val fileName = RemoteMirror.chapterFileName(
-            provider.getChapterDirName(chapter.name, chapter.scanlator, chapter.url),
-        )
         return remoteMirror.segmentsFor(
             provider.getSourceDirName(source),
             provider.getMangaDirName(manga.title),
-            fileName,
+            provider.remoteChapterFileNames(chapter.name, chapter.scanlator, chapter.url),
         )
     }
 

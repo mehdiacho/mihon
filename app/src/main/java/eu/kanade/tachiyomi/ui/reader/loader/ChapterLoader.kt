@@ -11,6 +11,7 @@ import eu.kanade.tachiyomi.ui.reader.model.ReaderChapter
 import mihon.core.archive.archiveReader
 import mihon.core.archive.epubReader
 import mihon.data.remote.RemoteMirror
+import mihon.data.remote.remoteChapterFileNames
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
@@ -136,8 +137,10 @@ class ChapterLoader(
             remoteMirror.segmentsFor(
                 sourceDirName = downloadProvider.getSourceDirName(source),
                 mangaDirName = downloadProvider.getMangaDirName(manga.title),
-                chapterFileName = RemoteMirror.chapterFileName(
-                    downloadProvider.getChapterDirName(dbChapter.name, dbChapter.scanlator, dbChapter.url),
+                chapterFileNames = downloadProvider.remoteChapterFileNames(
+                    dbChapter.name,
+                    dbChapter.scanlator,
+                    dbChapter.url,
                 ),
             )
         }.getOrNull()

@@ -7,6 +7,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import eu.kanade.tachiyomi.data.download.DownloadCache
+import eu.kanade.tachiyomi.data.download.DownloadProvider
 import eu.kanade.tachiyomi.util.system.isConnectedToWifi
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -105,6 +106,17 @@ class RemoteMirror(
         listOf(sourceDirName, mangaDirName, chapterFileName)
 
     /**
+     * Same, but preferring the name the remote already holds the chapter under.
+     * Falls back to the first candidate, which is the name an upload writes.
+     */
+    fun segmentsFor(sourceDirName: String, mangaDirName: String, chapterFileNames: List<String>): List<String> {
+        val name = index.resolve(sourceDirName, mangaDirName, chapterFileNames)
+            ?: chapterFileNames.firstOrNull()
+            ?: return emptyList()
+        return listOf(sourceDirName, mangaDirName, name)
+    }
+
+    /**
      * Records [file] as needing upload and asks WorkManager to drain the queue.
      *
      * Returns immediately and the caller is not told whether the upload
@@ -175,7 +187,7 @@ class RemoteMirror(
     /** Whether the remote is known to hold this chapter. See [RemoteIndex.contains]. */
     fun holds(segments: List<String>): Boolean {
         if (segments.size < 3) return false
-        return index.contains(segments[0], segments[1], segments[2])
+        return index.contains(segments[0], segments[1], listOf(segments[2]))
     }
 
     /**
@@ -383,3 +395,13 @@ class RemoteMirror(
         fun chapterFileName(chapterDirName: String): String = "$chapterDirName.cbz"
     }
 }
+
+/**
+ * Archive names the remote may hold this chapter under, current scheme first.
+ *
+ * Mihon started hashing the chapter URL into the name partway through its life
+ * and [DownloadProvider.getValidChapterDirNames] knows both spellings, so reuse
+ * it rather than only ever asking for the current one.
+ */
+fun DownloadProvider.remoteChapterFileNames(name: String, scanlator: String?, url: String): List<String> =
+    getValidChapterDirNames(name, scanlator, url).filter { it.endsWith(".cbz") }

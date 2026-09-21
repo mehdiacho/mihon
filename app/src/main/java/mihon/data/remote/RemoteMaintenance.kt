@@ -63,19 +63,21 @@ class RemoteMaintenance(
             if (keepStore.isSeriesKept(sourceDirName, mangaDirName)) continue
 
             for (chapter in getChaptersByMangaId.await(manga.id)) {
-                val chapterDirName = provider.getChapterDirName(chapter.name, chapter.scanlator, chapter.url)
-                val fileName = RemoteMirror.chapterFileName(chapterDirName)
-                val file = mangaDir.findFile(fileName) ?: continue
+                // Older downloads are named without the URL hash, on the
+                // device and on the server alike, so both lookups take the
+                // whole candidate list.
+                val fileNames = provider.remoteChapterFileNames(chapter.name, chapter.scanlator, chapter.url)
+                val file = fileNames.firstNotNullOfOrNull { mangaDir.findFile(it) } ?: continue
 
                 examined++
 
-                val segments = mirror.segmentsFor(sourceDirName, mangaDirName, fileName)
+                val segments = mirror.segmentsFor(sourceDirName, mangaDirName, fileNames)
                 if (keepStore.isKept(segments)) continue
 
                 // Never evict something the server has not been confirmed to
                 // hold. A miss here schedules a refresh and returns false, so
                 // the worst case is that this chapter waits for the next sweep.
-                if (!index.contains(sourceDirName, mangaDirName, fileName)) continue
+                if (!index.contains(sourceDirName, mangaDirName, fileNames)) continue
 
                 val due = when (timing) {
                     EvictionTiming.AFTER_READING -> chapter.read

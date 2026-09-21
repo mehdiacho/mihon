@@ -70,6 +70,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import logcat.LogPriority
 import mihon.data.remote.RemoteMirror
+import mihon.data.remote.remoteChapterFileNames
 import tachiyomi.core.common.preference.toggle
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.launchNonCancellable
@@ -534,8 +535,10 @@ class ReaderViewModel(
                     remoteMirror.segmentsFor(
                         sourceDirName = sourceDirName,
                         mangaDirName = mangaDirName,
-                        chapterFileName = RemoteMirror.chapterFileName(
-                            downloadProvider.getChapterDirName(chapter.name, chapter.scanlator, chapter.url),
+                        chapterFileNames = downloadProvider.remoteChapterFileNames(
+                            chapter.name,
+                            chapter.scanlator,
+                            chapter.url,
                         ),
                     ),
                 )
