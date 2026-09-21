@@ -32,6 +32,7 @@ import mihon.data.remote.ManualDownloadKeep
 import mihon.data.remote.MirrorExistingDownloads
 import mihon.data.remote.RedownloadSource
 import mihon.data.remote.RemoteHealth
+import mihon.data.remote.RemoteIndexSweep
 import mihon.data.remote.RemoteRole
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
@@ -55,6 +56,7 @@ object SettingsRemoteStorageScreen : SearchableSettings {
         val health = remember { context.appGraph.remoteHealth }
         val mirror = remember { context.appGraph.remoteMirror }
         val migrator = remember { context.appGraph.mirrorExistingDownloads }
+        val sweep = remember { context.appGraph.remoteIndexSweep }
 
         val enabled by prefs.enabled.collectAsState()
         val host by prefs.host.collectAsState()
@@ -72,6 +74,8 @@ object SettingsRemoteStorageScreen : SearchableSettings {
         val status by health.status.collectAsStateWithLifecycle()
         val pending by mirror.pendingUploads.collectAsStateWithLifecycle()
         val migrationState by migrator.state.collectAsStateWithLifecycle()
+        val sweepState by sweep.state.collectAsStateWithLifecycle()
+        val uploadError by mirror.lastUploadError.collectAsStateWithLifecycle()
 
         // Check as soon as the screen is opened rather than waiting out the
         // poll interval; arriving here usually means something is wrong.
@@ -272,13 +276,18 @@ object SettingsRemoteStorageScreen : SearchableSettings {
                 enabled = enabled,
                 preferenceItems = listOf(
                     Preference.PreferenceItem.TextPreference(
+                        title = stringResource(MR.strings.pref_remote_storage_sweep),
+                        subtitle = sweepSubtitle(sweepState),
+                        onClick = { scope.launch { sweep.run() } },
+                    ),
+                    Preference.PreferenceItem.TextPreference(
                         title = stringResource(MR.strings.pref_remote_storage_mirror_existing),
                         subtitle = migrationSubtitle(migrationState),
                         onClick = { scope.launch { migrator.run() } },
                     ),
                 ),
             ),
-        ) + pendingUploadsInfo(pending)
+        ) + pendingUploadsInfo(pending, uploadError)
     }
 
     /**
@@ -286,12 +295,45 @@ object SettingsRemoteStorageScreen : SearchableSettings {
      * noise on every visit.
      */
     @Composable
-    private fun pendingUploadsInfo(pending: Int): List<Preference> = if (pending > 0) {
-        listOf(
-            Preference.PreferenceItem.InfoPreference(stringResource(MR.strings.pref_remote_storage_pending, pending)),
+    private fun pendingUploadsInfo(pending: Int, error: String?): List<Preference> = buildList {
+        if (pending > 0) {
+            add(
+                Preference.PreferenceItem.InfoPreference(
+                    stringResource(MR.strings.pref_remote_storage_pending, pending),
+                ),
+            )
+        }
+        // A queue that never goes down is the symptom; the server's reason for
+        // refusing is the thing worth reading, and it was only in logcat.
+        if (error != null) {
+            add(
+                Preference.PreferenceItem.InfoPreference(
+                    stringResource(MR.strings.pref_remote_storage_upload_error, error),
+                ),
+            )
+        }
+    }
+
+    @Composable
+    private fun sweepSubtitle(state: RemoteIndexSweep.State): String = when (state) {
+        is RemoteIndexSweep.State.Idle ->
+            stringResource(MR.strings.pref_remote_storage_sweep_summary)
+        is RemoteIndexSweep.State.Running -> stringResource(
+            MR.strings.pref_remote_storage_sweep_running,
+            state.done,
+            state.total,
+            state.chapters,
         )
-    } else {
-        emptyList()
+        is RemoteIndexSweep.State.Done -> if (state.unreachable > 0) {
+            stringResource(
+                MR.strings.pref_remote_storage_sweep_done_unreachable,
+                state.chapters,
+                state.series,
+                state.unreachable,
+            )
+        } else {
+            stringResource(MR.strings.pref_remote_storage_sweep_done, state.chapters, state.series)
+        }
     }
 
     @Composable

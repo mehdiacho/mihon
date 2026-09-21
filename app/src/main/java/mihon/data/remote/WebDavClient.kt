@@ -101,6 +101,10 @@ class WebDavClient(
 
         return runCatching {
             execute(request).use { response ->
+                // 404 is an answer: there is no such directory, so it holds
+                // nothing. Anything else that failed is not an answer at all,
+                // and null is how the caller is told to ask again later.
+                if (response.code == 404) return@use emptyList()
                 if (!response.isSuccessful) return@use null
                 parseMultiStatus(response.body.byteStream(), selfPath = url.encodedPath)
             }
@@ -158,20 +162,24 @@ class WebDavClient(
     /**
      * Creates every directory in [segments], parents first.
      *
-     * A 405 means the collection is already there, which is the normal case and
-     * not a failure: MKCOL has no "if not exists" form.
+     * MKCOL has no "if not exists" form. A 405 is the standard answer for one
+     * that is already there; servers also answer 403 or 409, so anything that
+     * fails is checked rather than trusted. A directory we can list is a
+     * directory we do not need to create.
      */
     fun createCollections(segments: List<String>): Result<Unit> = runCatching {
         for (depth in 1..segments.size) {
+            val path = segments.take(depth)
             val request = Request.Builder()
-                .url(urlFor(segments.take(depth)))
+                .url(urlFor(path))
                 .method("MKCOL", null)
                 .withAuth()
                 .build()
-            execute(request).use { response ->
-                if (!response.isSuccessful && response.code != 405) {
-                    throw IOException("MKCOL ${segments.take(depth).joinToString("/")} -> ${response.code}")
-                }
+            val code = execute(request).use { response ->
+                if (response.isSuccessful) null else response.code
+            }
+            if (code != null && code != 405 && list(path) == null) {
+                throw IOException("MKCOL ${path.joinToString("/")} -> $code")
             }
         }
     }

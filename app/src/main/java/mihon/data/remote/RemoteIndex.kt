@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import logcat.LogPriority
+import tachiyomi.core.common.util.system.logcat
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -109,19 +112,35 @@ class RemoteIndex(
             try {
                 val client = clientProvider.get() ?: return@launch
                 val listing = client.list(listOf(sourceDirName, mangaDirName))
+                if (listing == null) {
+                    // Caching a failed request as "holds nothing" is how one
+                    // refused connection becomes a permanent "not on the
+                    // server" for a whole series. Leave the key unknown.
+                    logcat(LogPriority.WARN) { "Could not list $key on the remote" }
+                    return@launch
+                }
                 mutex.withLock {
-                    // A directory that does not exist is a valid answer -- it
-                    // means the remote holds nothing for this manga -- and is
-                    // cached as the empty set so it is not asked again.
-                    entries[key] = listing.orEmpty()
-                        .filter { !it.isDirectory }
-                        .mapTo(HashSet()) { it.name }
+                    entries[key] = listing.filter { !it.isDirectory }.mapTo(HashSet()) { it.name }
                 }
                 _changes.tryEmit(Unit)
             } finally {
                 inFlight.remove(key)
             }
         }
+    }
+
+    /**
+     * [refresh], but waits for the answer and reports what was found. Null
+     * means the server could not be asked. Used by the sweep, which needs to
+     * count and to know the difference between empty and unreachable.
+     */
+    suspend fun refreshNow(sourceDirName: String, mangaDirName: String): Int? {
+        val client = clientProvider.get() ?: return null
+        val listing = withContext(Dispatchers.IO) { client.list(listOf(sourceDirName, mangaDirName)) } ?: return null
+        val names = listing.filter { !it.isDirectory }.mapTo(HashSet()) { it.name }
+        mutex.withLock { entries[keyOf(sourceDirName, mangaDirName)] = names }
+        _changes.tryEmit(Unit)
+        return names.size
     }
 
     /** Records an upload without a round trip to confirm what we just did. */

@@ -1155,6 +1155,12 @@
     <string name="pref_remote_storage_mirror_existing_running">%1$d of %2$d · %3$s</string>
     <string name="pref_remote_storage_mirror_existing_done">Done: %1$d uploaded, %2$d already there, %3$d failed</string>
     <string name="pref_remote_storage_pending">%1$d waiting to upload</string>
+    <string name="pref_remote_storage_upload_error">Last upload failed: %1$s</string>
+    <string name="pref_remote_storage_sweep">Check what the server has</string>
+    <string name="pref_remote_storage_sweep_summary">Ask the server about every series in your library and refresh the cloud markers. Nothing is uploaded or deleted.</string>
+    <string name="pref_remote_storage_sweep_running">%1$d of %2$d · %3$d chapters found</string>
+    <string name="pref_remote_storage_sweep_done">%1$d chapters across %2$d series</string>
+    <string name="pref_remote_storage_sweep_done_unreachable">%1$d chapters across %2$d series · %3$d could not be checked</string>
     <string name="action_keep_on_device">Keep on this device</string>
     <string name="action_allow_removal">Allow removal from device</string>
     <string name="action_delete_remote_copy">Delete server copy</string>

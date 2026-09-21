@@ -58,6 +58,16 @@ class RemoteMirror(
     /** How many uploads are outstanding, for the settings screen. */
     val pendingUploads = uploadQueue.size
 
+    private val _lastUploadError = MutableStateFlow<String?>(null)
+
+    /**
+     * Why the last upload failed, for the settings screen to show.
+     *
+     * Uploads happen in a worker and retry forever, so without this the only
+     * symptom of a misconfigured server is a queue that never goes down.
+     */
+    val lastUploadError = _lastUploadError.asStateFlow()
+
     private val _activeFetch = MutableStateFlow<FetchProgress?>(null)
 
     /** The fetch currently in progress, if any, so the reader can show it. */
@@ -307,7 +317,9 @@ class RemoteMirror(
         if (client.sizeOf(entry.segments) != length) {
             val put = client.put(entry.segments, length) { file.openInputStream() }
             if (put.isFailure) {
-                logcat(LogPriority.WARN, put.exceptionOrNull()) { "Upload failed: ${entry.segments}" }
+                val cause = put.exceptionOrNull()
+                logcat(LogPriority.WARN, cause) { "Upload failed: ${entry.segments}" }
+                _lastUploadError.value = cause?.message ?: cause?.let { it::class.simpleName }
                 return false
             }
 
@@ -322,6 +334,7 @@ class RemoteMirror(
             }
         }
 
+        _lastUploadError.value = null
         index.onUploaded(entry.segments)
         uploadQueue.remove(entry.segments)
         maybeEvict(file, entry)
