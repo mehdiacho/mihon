@@ -45,6 +45,7 @@ internal fun LibraryComfortableGrid(
                 ),
                 coverBadgeStart = {
                     DownloadsBadge(count = libraryItem.badges.downloadCount)
+                    RemoteBadge(count = libraryItem.badges.remoteCount)
                     UnreadBadge(count = libraryItem.badges.unreadCount)
                 },
                 coverBadgeEnd = {

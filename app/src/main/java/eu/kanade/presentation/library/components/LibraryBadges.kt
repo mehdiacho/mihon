@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import mihon.icons.materialsymbols.MaterialSymbols
+import mihon.icons.materialsymbols.rounded.Cloud
 import mihon.icons.materialsymbols.rounded.Folder
 import tachiyomi.presentation.core.components.Badge
 
@@ -16,6 +17,25 @@ internal fun DownloadsBadge(count: Int) {
             text = "$count",
             color = MaterialTheme.colorScheme.tertiary,
             textColor = MaterialTheme.colorScheme.onTertiary,
+        )
+    }
+}
+
+/**
+ * Chapters the server holds. Shown next to the download badge rather than
+ * merged with it: the two answer different questions, and a series that is
+ * entirely on the server and entirely off the device is the normal state once
+ * eviction is on.
+ */
+@Composable
+internal fun RemoteBadge(count: Int) {
+    if (count > 0) {
+        Badge(
+            text = "$count",
+            imageVector = MaterialSymbols.Rounded.Cloud,
+            color = MaterialTheme.colorScheme.secondary,
+            textColor = MaterialTheme.colorScheme.onSecondary,
+            iconColor = MaterialTheme.colorScheme.onSecondary,
         )
     }
 }
@@ -53,6 +73,7 @@ private fun BadgePreview() {
     TachiyomiPreviewTheme {
         Column {
             DownloadsBadge(count = 10)
+            RemoteBadge(count = 10)
             UnreadBadge(count = 10)
             LanguageBadge(isLocal = true, sourceLanguage = "EN")
             LanguageBadge(isLocal = false, sourceLanguage = "EN")

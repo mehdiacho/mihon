@@ -205,6 +205,10 @@ class RemoteMirror(
     suspend fun refreshHolds(sourceDirName: String, mangaDirName: String): Boolean =
         index.refreshNow(sourceDirName, mangaDirName) != null
 
+    /** How many chapters the remote holds for a series. See [RemoteIndex.countFor]. */
+    fun countFor(sourceDirName: String, mangaDirName: String): Int =
+        index.countFor(sourceDirName, mangaDirName)
+
     /** Whether the remote is known to hold this chapter. See [RemoteIndex.contains]. */
     fun holds(segments: List<String>): Boolean {
         if (segments.size < 3) return false

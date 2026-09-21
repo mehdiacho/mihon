@@ -1,5 +1,6 @@
 package mihon.data.remote
 
+import android.content.Context
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -7,15 +8,22 @@ import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromStream
+import kotlinx.serialization.json.encodeToStream
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Knows which chapters the remote holds.
@@ -33,6 +41,8 @@ import java.util.concurrent.ConcurrentHashMap
 @Inject
 @SingleIn(AppScope::class)
 class RemoteIndex(
+    private val context: Context,
+    private val json: Json,
     private val preferences: RemoteStoragePreferences,
     private val clientProvider: RemoteClientProvider,
 ) {
@@ -57,6 +67,70 @@ class RemoteIndex(
 
     /** Emits when the index has learned something new. */
     val changes = _changes.asSharedFlow()
+
+    /**
+     * Coalesces writes to [file]. Conflated because only the latest state is
+     * worth writing, and a bulk upload would otherwise write the whole index
+     * once per chapter.
+     */
+    private val saveRequests = Channel<Unit>(Channel.CONFLATED)
+
+    /** Also guards against a load landing after an [invalidate] and undoing it. */
+    private val loaded = AtomicBoolean(false)
+
+    private val file: File
+        get() = File(context.filesDir, FILE_NAME)
+
+    init {
+        scope.launch {
+            load()
+            for (unused in saveRequests) {
+                delay(SAVE_DEBOUNCE_MS)
+                save()
+            }
+        }
+    }
+
+    /**
+     * Reads the index back from disk.
+     *
+     * Without this the library badge would read zero on every cold start until
+     * something walked the whole library again, which is several hundred
+     * requests to answer a question the app already knew the answer to.
+     */
+    private fun load() {
+        if (!loaded.compareAndSet(false, true)) return
+        val file = file
+        if (!file.exists()) return
+        runCatching {
+            file.inputStream().use { json.decodeFromStream<Map<String, Set<String>>>(it) }
+        }
+            .onSuccess { stored ->
+                // putIfAbsent: a live listing that arrived while this was
+                // reading is newer than anything on disk.
+                stored.forEach { (key, names) -> entries.putIfAbsent(key, names) }
+                _changes.tryEmit(Unit)
+            }
+            .onFailure {
+                logcat(LogPriority.WARN, it) { "Could not read the remote index; starting empty" }
+                file.delete()
+            }
+    }
+
+    private fun save() {
+        val snapshot = entries.toMap()
+        runCatching {
+            // Written beside the real file and renamed, so a kill mid-write
+            // leaves the previous index rather than a truncated one.
+            val partial = File(file.parentFile, "$FILE_NAME.part")
+            partial.outputStream().use { json.encodeToStream(snapshot, it) }
+            if (!partial.renameTo(file)) partial.delete()
+        }.onFailure { logcat(LogPriority.WARN, it) { "Could not write the remote index" } }
+    }
+
+    private fun scheduleSave() {
+        saveRequests.trySend(Unit)
+    }
 
     private fun keyOf(sourceDirName: String, mangaDirName: String) = "$sourceDirName/$mangaDirName"
 
@@ -123,6 +197,7 @@ class RemoteIndex(
                     entries[key] = listing.filter { !it.isDirectory }.mapTo(HashSet()) { it.name }
                 }
                 _changes.tryEmit(Unit)
+                scheduleSave()
             } finally {
                 inFlight.remove(key)
             }
@@ -140,6 +215,7 @@ class RemoteIndex(
         val names = listing.filter { !it.isDirectory }.mapTo(HashSet()) { it.name }
         mutex.withLock { entries[keyOf(sourceDirName, mangaDirName)] = names }
         _changes.tryEmit(Unit)
+        scheduleSave()
         return names.size
     }
 
@@ -157,6 +233,7 @@ class RemoteIndex(
             return
         }
         _changes.tryEmit(Unit)
+        scheduleSave()
     }
 
     /** Records a deletion, likewise. */
@@ -165,17 +242,28 @@ class RemoteIndex(
         val key = keyOf(segments[0], segments[1])
         entries.computeIfPresent(key) { _, existing -> existing - segments.last() }
         _changes.tryEmit(Unit)
+        scheduleSave()
     }
 
     /** Forgets a manga directory, e.g. after it is renamed. */
     fun forget(sourceDirName: String, mangaDirName: String) {
         entries.remove(keyOf(sourceDirName, mangaDirName))
         _changes.tryEmit(Unit)
+        scheduleSave()
     }
 
     /** Drops everything; the next query re-lists. */
     fun invalidate() {
+        loaded.set(true)
         entries.clear()
         _changes.tryEmit(Unit)
+        scheduleSave()
+    }
+
+    companion object {
+        private const val FILE_NAME = "remote_index.json"
+
+        /** Long enough that a bulk upload writes once rather than per chapter. */
+        private const val SAVE_DEBOUNCE_MS = 2_000L
     }
 }

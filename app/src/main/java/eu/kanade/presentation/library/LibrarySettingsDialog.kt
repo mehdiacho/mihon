@@ -91,6 +91,16 @@ private fun ColumnScope.FilterPage(
         enabled = !downloadedOnly,
         onClick = { viewModel.toggleFilter(LibraryPreferences::filterDownloaded) },
     )
+    // Only when there is a server to ask about. Otherwise it is a filter that
+    // matches nothing, with no way to tell why.
+    if (viewModel.mirroringEnabled) {
+        val filterRemote by viewModel.libraryPreferences.filterRemote.collectAsState()
+        TriStateItem(
+            label = stringResource(MR.strings.action_filter_on_server),
+            state = filterRemote,
+            onClick = { viewModel.toggleFilter(LibraryPreferences::filterRemote) },
+        )
+    }
     val filterUnread by viewModel.libraryPreferences.filterUnread.collectAsState()
     TriStateItem(
         label = stringResource(MR.strings.action_filter_unread),
@@ -269,6 +279,12 @@ private fun ColumnScope.DisplayPage(
         label = stringResource(MR.strings.action_display_download_badge),
         pref = viewModel.libraryPreferences.downloadBadge,
     )
+    if (viewModel.mirroringEnabled) {
+        CheckboxItem(
+            label = stringResource(MR.strings.action_display_remote_badge),
+            pref = viewModel.libraryPreferences.remoteBadge,
+        )
+    }
     CheckboxItem(
         label = stringResource(MR.strings.action_display_unread_badge),
         pref = viewModel.libraryPreferences.unreadBadge,

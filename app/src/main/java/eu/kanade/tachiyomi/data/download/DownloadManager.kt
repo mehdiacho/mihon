@@ -236,6 +236,20 @@ class DownloadManager(
         return cache.getDownloadCount(manga)
     }
 
+    /**
+     * How many chapters of [manga] the server holds.
+     *
+     * Counts files in the remote directory rather than matching them against
+     * the chapter list, which is what the local count does too. A first call
+     * for a series returns 0 and starts a listing in the background; the index
+     * signals when it has an answer.
+     */
+    suspend fun getRemoteCount(manga: Manga): Int {
+        if (!remoteMirror.isEnabled) return 0
+        val source = sourceManager.getOrStub(manga.source)
+        return remoteMirror.countFor(provider.getSourceDirName(source), provider.getMangaDirName(manga.title))
+    }
+
     fun cancelQueuedDownloads(downloads: List<Download>) {
         removeFromDownloadQueue(downloads.map { it.chapter })
     }
