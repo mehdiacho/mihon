@@ -4,8 +4,10 @@ import com.hippo.unifile.UniFile
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.storage.service.StorageManager
@@ -57,12 +59,21 @@ class MirrorExistingDownloads(
      * Suspending and cancellable rather than fire-and-forget: this is a
      * foreground action the user started and can watch, unlike the automatic
      * per-chapter mirroring.
+     *
+     * The dispatcher is chosen here rather than left to the caller. Every step
+     * of this blocks -- walking a SAF tree, stat-ing each file, and one HTTP
+     * request per chapter -- so a caller that launches it from a composable's
+     * scope gets the main thread, an ANR, and a NetworkOnMainThreadException
+     * per chapter swallowed into the failure count.
      */
-    suspend fun run() {
-        if (!mirror.isEnabled) return
+    suspend fun run() = withContext(Dispatchers.IO) {
+        if (!mirror.isEnabled) return@withContext
 
-        val client = clientProvider.get() ?: return
-        val root = storageManager.getDownloadsDirectory() ?: return
+        val client = clientProvider.get() ?: return@withContext
+        val root = storageManager.getDownloadsDirectory() ?: return@withContext
+
+        // Nothing from a previous run should decide what this one uploads.
+        remoteListings.clear()
 
         _state.value = State.Scanning(0)
 
@@ -89,31 +100,30 @@ class MirrorExistingDownloads(
         // One listing per manga directory, rather than one HEAD per chapter.
         // Over a library of several thousand chapters that is the difference
         // between a few hundred requests and a few thousand.
-        val listedDirs = mutableMapOf<String, Set<String>>()
-
         candidates.forEachIndexed { i, candidate ->
             _state.value = State.Running(uploaded, skipped, failed, candidates.size, candidate.segments[1])
 
-            val dirKey = "${candidate.segments[0]}/${candidate.segments[1]}"
-            val present = listedDirs.getOrPut(dirKey) {
+            val (source, manga, chapter) = candidate.segments
+            val dirKey = "$source/$manga"
+            val remote = remoteListings.getOrPut(dirKey) {
                 client.list(candidate.segments.dropLast(1)).orEmpty()
                     .filter { !it.isDirectory }
                     .associate { it.name to it.size }
-                    .also { listing ->
-                        remoteSizes[dirKey] = listing
-                    }
-                    .keys
             }
 
             val localSize = candidate.file.length()
-            val remoteSize = remoteSizes[dirKey]?.get(candidate.segments[2])
 
             when {
-                candidate.segments[2] in present && remoteSize == localSize -> {
+                // Same name and same length is as close to "already there" as
+                // this can get without reading both copies back.
+                remote[chapter] == localSize && localSize > 0L -> {
                     skipped++
                     index.onUploaded(candidate.segments)
                 }
-                localSize <= 0L -> failed++
+                localSize <= 0L -> {
+                    failed++
+                    logcat(LogPriority.WARN) { "Empty or unreadable: $dirKey/$chapter" }
+                }
                 else -> {
                     val result = client.put(candidate.segments, localSize) { candidate.file.openInputStream() }
                     if (result.isSuccess) {
@@ -121,7 +131,7 @@ class MirrorExistingDownloads(
                         index.onUploaded(candidate.segments)
                     } else {
                         failed++
-                        logcat(LogPriority.WARN) { "Could not mirror ${candidate.segments.joinToString("/")}" }
+                        logcat(LogPriority.WARN, result.exceptionOrNull()) { "Could not mirror $dirKey/$chapter" }
                     }
                 }
             }
@@ -140,7 +150,8 @@ class MirrorExistingDownloads(
         _state.value = State.Idle
     }
 
-    private val remoteSizes = mutableMapOf<String, Map<String, Long>>()
+    /** One PROPFIND per manga directory, reused across its chapters. */
+    private val remoteListings = mutableMapOf<String, Map<String, Long>>()
 
     private data class Candidate(val file: UniFile, val segments: List<String>)
 }

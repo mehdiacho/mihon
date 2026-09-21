@@ -4,8 +4,10 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import eu.kanade.tachiyomi.data.download.DownloadProvider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.manga.interactor.GetFavorites
@@ -46,8 +48,13 @@ class RemoteIndexSweep(
         data class Done(val series: Int, val chapters: Int, val unreachable: Int) : State
     }
 
-    suspend fun run() {
-        if (!mirror.isEnabled) return
+    /**
+     * One request per series, on [Dispatchers.IO] -- chosen here so that a
+     * caller launching this from a composable's scope cannot put a few hundred
+     * blocking requests on the main thread.
+     */
+    suspend fun run() = withContext(Dispatchers.IO) {
+        if (!mirror.isEnabled) return@withContext
 
         // Dropped rather than merged: the point of running this is to stop
         // trusting what is already in there.
