@@ -63,13 +63,31 @@ class WebDavClient(
 
     private fun execute(request: Request): Response = client.newCall(request).execute()
 
+    /**
+     * PROPFIND rather than HEAD, because the thing being tested is a directory.
+     *
+     * HEAD asks for a file. Asking for a collection that way gets a redirect to
+     * the trailing-slash form, and a server behind a published port routinely
+     * builds that redirect from the port it listens on rather than the one it
+     * was reached through -- so the client quietly follows it to a different
+     * server and reports whatever that one says. PROPFIND is how WebDAV asks
+     * whether a collection is there, and it answers about the collection.
+     */
     override fun testConnection(): Result<Unit> = runCatching {
-        val request = Request.Builder().url(base).head().withAuth().build()
+        val request = Request.Builder()
+            .url(base)
+            .method("PROPFIND", PROPFIND_BODY.toRequestBody(XML_MEDIA_TYPE))
+            .header("Depth", "0")
+            .withAuth()
+            .build()
         execute(request).use { response ->
             when {
                 response.isSuccessful -> Unit
-                response.code == 401 -> throw IOException("Authentication rejected (401)")
+                response.code == 401 || response.code == 403 ->
+                    throw IOException("Authentication rejected (${response.code})")
                 response.code == 404 -> throw IOException("Path not found on server (404)")
+                response.isRedirect ->
+                    throw IOException("Server redirected to ${response.header("Location")}")
                 else -> throw IOException("Server returned ${response.code}")
             }
         }
