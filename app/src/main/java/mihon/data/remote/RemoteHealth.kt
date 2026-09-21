@@ -56,7 +56,7 @@ class RemoteHealth(
     init {
         scope.launch {
             while (true) {
-                if (preferences.enabled.get() && preferences.url.get().isNotBlank()) {
+                if (preferences.enabled.get() && preferences.isConfigured) {
                     check()
                 } else {
                     _status.value = Status.UNKNOWN

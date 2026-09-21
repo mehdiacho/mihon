@@ -9,8 +9,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -19,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.kanade.presentation.more.settings.Preference
+import eu.kanade.presentation.more.settings.widget.TextPreferenceWidget
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -54,7 +57,10 @@ object SettingsRemoteStorageScreen : SearchableSettings {
         val migrator = remember { context.appGraph.mirrorExistingDownloads }
 
         val enabled by prefs.enabled.collectAsState()
-        val url by prefs.url.collectAsState()
+        val host by prefs.host.collectAsState()
+        val port by prefs.port.collectAsState()
+        val useHttps by prefs.useHttps.collectAsState()
+        val folder by prefs.folder.collectAsState()
         val username by prefs.username.collectAsState()
         val password by prefs.password.collectAsState()
         val readAhead by prefs.readAheadChapters.collectAsState()
@@ -69,8 +75,8 @@ object SettingsRemoteStorageScreen : SearchableSettings {
 
         // Check as soon as the screen is opened rather than waiting out the
         // poll interval; arriving here usually means something is wrong.
-        LaunchedEffect(enabled, url) {
-            if (enabled && url.isNotBlank()) {
+        LaunchedEffect(enabled, host, port, useHttps, folder) {
+            if (enabled && host.isNotBlank()) {
                 health.check()
                 // Opening this screen is usually a reaction to something not
                 // having happened, so nudge a queue that may be stalled.
@@ -89,9 +95,18 @@ object SettingsRemoteStorageScreen : SearchableSettings {
                 enabled = enabled,
                 preferenceItems = listOf(
                     Preference.PreferenceItem.EditTextPreference(
-                        preference = prefs.url,
-                        title = stringResource(MR.strings.pref_remote_storage_url),
-                        subtitle = url.ifEmpty { stringResource(MR.strings.pref_remote_storage_url_hint) },
+                        preference = prefs.host,
+                        title = stringResource(MR.strings.pref_remote_storage_host),
+                        subtitle = host.ifEmpty { stringResource(MR.strings.pref_remote_storage_url_hint) },
+                    ),
+                    Preference.PreferenceItem.EditTextPreference(
+                        preference = prefs.port,
+                        title = stringResource(MR.strings.pref_remote_storage_port),
+                        subtitle = port.ifEmpty { stringResource(MR.strings.pref_remote_storage_port_default) },
+                    ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = prefs.useHttps,
+                        title = stringResource(MR.strings.pref_remote_storage_https),
                     ),
                     Preference.PreferenceItem.EditTextPreference(
                         preference = prefs.username,
@@ -109,21 +124,55 @@ object SettingsRemoteStorageScreen : SearchableSettings {
                             stringResource(MR.strings.pref_remote_storage_password_set)
                         },
                     ),
+                    Preference.PreferenceItem.CustomPreference(
+                        title = stringResource(MR.strings.pref_remote_storage_folder),
+                    ) {
+                        // A row rather than an EditTextPreference: the useful
+                        // question is which of the folders up there this is,
+                        // and only the server can answer that.
+                        var picking by remember { mutableStateOf(false) }
+
+                        TextPreferenceWidget(
+                            title = stringResource(MR.strings.pref_remote_storage_folder),
+                            subtitle = folder.ifEmpty { stringResource(MR.strings.pref_remote_storage_folder_root) },
+                            onPreferenceClick = {
+                                if (host.isBlank()) {
+                                    context.toast(MR.strings.pref_remote_storage_folder_no_host)
+                                } else {
+                                    picking = true
+                                }
+                            },
+                        )
+
+                        if (picking) {
+                            RemoteFolderPickerDialog(
+                                client = remember(host, port, useHttps, username, password) {
+                                    clientProvider.buildServerRoot()
+                                },
+                                initialPath = folder,
+                                onConfirm = {
+                                    prefs.folder.set(it)
+                                    picking = false
+                                },
+                                onDismissRequest = { picking = false },
+                            )
+                        }
+                    },
                     Preference.PreferenceItem.TextPreference(
                         title = stringResource(MR.strings.pref_remote_storage_test),
                         subtitle = statusLabel(status),
                         widget = { StatusDot(status) },
                         onClick = {
-                            if (url.isBlank()) {
+                            if (host.isBlank()) {
                                 context.toast(MR.strings.pref_remote_storage_test_no_url)
                                 return@TextPreference
                             }
                             context.toast(MR.strings.pref_remote_storage_testing)
                             scope.launch {
                                 val result = withContext(Dispatchers.IO) {
-                                    val client = clientProvider.build(url, username, password)
+                                    val client = clientProvider.build(prefs.collectionUrl(), username, password)
                                     client?.testConnection()
-                                        ?: Result.failure(IllegalStateException("Invalid server URL"))
+                                        ?: Result.failure(IllegalStateException("Invalid server address"))
                                 }
                                 // Keep the dot honest about what was just observed,
                                 // rather than leaving it stale until the next poll.

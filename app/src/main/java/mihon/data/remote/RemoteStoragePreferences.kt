@@ -3,6 +3,7 @@ package mihon.data.remote
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import okhttp3.HttpUrl
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.preference.getEnum
@@ -23,8 +24,22 @@ class RemoteStoragePreferences(
 
     val enabled: Preference<Boolean> = preferenceStore.getBoolean("remote_storage_enabled", false)
 
-    /** Collection URL, e.g. `https://dav.example.com/manga`. Trailing slash optional. */
-    val url: Preference<String> = preferenceStore.getString("remote_storage_url", "")
+    /** Host name or IP, without a scheme. */
+    val host: Preference<String> = preferenceStore.getString("remote_storage_host", "")
+
+    /** Blank for the scheme's default, 443 or 80. */
+    val port: Preference<String> = preferenceStore.getString("remote_storage_port", "")
+
+    val useHttps: Preference<Boolean> = preferenceStore.getBoolean("remote_storage_https", true)
+
+    /** Path to the collection under the server root, e.g. `manga/preview`. */
+    val folder: Preference<String> = preferenceStore.getString("remote_storage_folder", "")
+
+    /**
+     * What the settings held before they were split into the fields above.
+     * Read once, at construction, and then cleared. See [adoptLegacyUrl].
+     */
+    private val legacyUrl: Preference<String> = preferenceStore.getString("remote_storage_url", "")
 
     val username: Preference<String> = preferenceStore.getString("remote_storage_username", "")
 
@@ -93,6 +108,49 @@ class RemoteStoragePreferences(
      * this is a preference rather than a constant for that reason.
      */
     val cacheSizeMb: Preference<Int> = preferenceStore.getInt("remote_storage_cache_mb", 2048)
+
+    init {
+        adoptLegacyUrl()
+    }
+
+    /** Whether there is enough here to build a client. */
+    val isConfigured: Boolean
+        get() = host.get().isNotBlank()
+
+    /** `scheme://host[:port]`, with no path. Blank when no host is set. */
+    fun serverUrl(): String {
+        val host = host.get().trim().trimEnd('/').substringAfter("://")
+        if (host.isEmpty()) return ""
+        val scheme = if (useHttps.get()) "https" else "http"
+        val port = port.get().trim().toIntOrNull()?.takeIf { it in 1..65535 }
+        return if (port == null) "$scheme://$host" else "$scheme://$host:$port"
+    }
+
+    /** [serverUrl] plus [folder]: the collection chapters are written into. */
+    fun collectionUrl(): String {
+        val server = serverUrl()
+        if (server.isEmpty()) return ""
+        val folder = folder.get().trim().trim('/')
+        return if (folder.isEmpty()) server else "$server/$folder"
+    }
+
+    /**
+     * Splits the old single URL field into the parts above.
+     *
+     * Runs once, when this is first constructed after the update, so that
+     * nothing downstream has to know the old field ever existed.
+     */
+    private fun adoptLegacyUrl() {
+        val legacy = legacyUrl.get()
+        if (legacy.isBlank() || host.get().isNotBlank()) return
+
+        val parsed = WebDavClient.normalize(legacy) ?: return
+        useHttps.set(parsed.scheme == "https")
+        host.set(parsed.host)
+        port.set(if (parsed.port == HttpUrl.defaultPort(parsed.scheme)) "" else parsed.port.toString())
+        folder.set(parsed.pathSegments.filter { it.isNotEmpty() }.joinToString("/"))
+        legacyUrl.delete()
+    }
 }
 
 enum class RemoteRole {

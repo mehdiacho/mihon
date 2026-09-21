@@ -31,10 +31,22 @@ class RemoteClientProvider(
      * so that "Test connection" works before the feature is switched on.
      */
     fun build(
-        url: String = preferences.url.get(),
+        url: String = preferences.collectionUrl(),
         username: String = preferences.username.get(),
         password: String = preferences.password.get(),
-    ): RemoteStorage? {
+    ): RemoteStorage? = buildAt(url, username, password)
+
+    /**
+     * A client rooted at the server itself rather than at the collection, so
+     * the folder picker can list what is up there before one is chosen.
+     */
+    fun buildServerRoot(
+        url: String = preferences.serverUrl(),
+        username: String = preferences.username.get(),
+        password: String = preferences.password.get(),
+    ): WebDavClient? = buildAt(url, username, password)
+
+    private fun buildAt(url: String, username: String, password: String): WebDavClient? {
         if (url.isBlank()) return null
         return runCatching {
             WebDavClient(

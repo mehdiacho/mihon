@@ -40,7 +40,7 @@ class RemoteUploadJob(private val context: Context, workerParams: WorkerParamete
     override suspend fun doWork(): Result {
         graph.inject(this)
 
-        if (!preferences.enabled.get() || preferences.url.get().isBlank()) {
+        if (!preferences.enabled.get() || !preferences.isConfigured) {
             // Nothing can drain while the feature is off. Keep the queue rather
             // than discarding it: switching mirroring back on should pick up
             // where it left off.

@@ -83,7 +83,7 @@ class RemoteMirror(
     }
 
     val isEnabled: Boolean
-        get() = preferences.enabled.get() && preferences.url.get().isNotBlank()
+        get() = preferences.enabled.get() && preferences.isConfigured
 
     /** Whether any policy would remove local copies of mirrored chapters. */
     val evictsLocalCopies: Boolean
