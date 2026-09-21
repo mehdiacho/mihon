@@ -44,6 +44,7 @@ class RemoteMaintenance(
     private val sourceManager: SourceManager,
     private val getFavorites: GetFavorites,
     private val getChaptersByMangaId: GetChaptersByMangaId,
+    private val notifier: RemoteNotifier,
 ) {
 
     data class Result(val evicted: Int, val examined: Int, val freedBytes: Long)
@@ -92,10 +93,21 @@ class RemoteMaintenance(
      * this removes can be read back on demand.
      */
     suspend fun reclaimNow(): Result {
-        val result = walk(Mode.ON_DEMAND) { examined, evicted, freed ->
-            _state.value = State.Running(examined, evicted, freed)
+        // An ongoing notification outlives the coroutine that posted it, so the
+        // dismissal has to survive cancellation too.
+        // Posted before the walk starts: the first eviction can be a minute of
+        // PROPFINDs away, and until then there would be nothing in the shade.
+        notifier.reclaimProgress(0, 0L)
+        val result = try {
+            walk(Mode.ON_DEMAND) { examined, evicted, freed ->
+                _state.value = State.Running(examined, evicted, freed)
+                notifier.reclaimProgress(evicted, freed)
+            }
+        } finally {
+            notifier.dismissProgress()
         }
         _state.value = State.Done(result.evicted, result.freedBytes)
+        notifier.reclaimDone(result.evicted, result.freedBytes)
         return result
     }
 

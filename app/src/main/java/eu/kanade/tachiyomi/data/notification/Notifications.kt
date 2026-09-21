@@ -65,6 +65,15 @@ object Notifications {
     const val ID_INCOGNITO_MODE = -701
 
     /**
+     * Notification channel and ids used by the remote storage mirror.
+     */
+    private const val GROUP_REMOTE_STORAGE = "group_remote_storage"
+    const val CHANNEL_REMOTE_STORAGE_PROGRESS = "remote_storage_progress_channel"
+    const val ID_REMOTE_STORAGE_PROGRESS = -801
+    const val CHANNEL_REMOTE_STORAGE_COMPLETE = "remote_storage_complete_channel"
+    const val ID_REMOTE_STORAGE_COMPLETE = -802
+
+    /**
      * Notification channel and ids used for extension updates.
      */
     private const val GROUP_APK_UPDATES = "group_apk_updates"
@@ -111,6 +120,9 @@ object Notifications {
                 buildNotificationChannelGroup(GROUP_APK_UPDATES) {
                     setName(context.stringResource(MR.strings.label_recent_updates))
                 },
+                buildNotificationChannelGroup(GROUP_REMOTE_STORAGE) {
+                    setName(context.stringResource(MR.strings.pref_category_remote_storage))
+                },
             ),
         )
 
@@ -155,6 +167,17 @@ object Notifications {
                 },
                 buildNotificationChannel(CHANNEL_INCOGNITO_MODE, IMPORTANCE_LOW) {
                     setName(context.stringResource(MR.strings.pref_incognito_mode))
+                },
+                buildNotificationChannel(CHANNEL_REMOTE_STORAGE_PROGRESS, IMPORTANCE_LOW) {
+                    setName(context.stringResource(MR.strings.channel_progress))
+                    setGroup(GROUP_REMOTE_STORAGE)
+                    setShowBadge(false)
+                },
+                buildNotificationChannel(CHANNEL_REMOTE_STORAGE_COMPLETE, IMPORTANCE_LOW) {
+                    setName(context.stringResource(MR.strings.channel_complete))
+                    setGroup(GROUP_REMOTE_STORAGE)
+                    setShowBadge(false)
+                    setSound(null, null)
                 },
                 buildNotificationChannel(CHANNEL_EXTENSIONS_UPDATE, IMPORTANCE_DEFAULT) {
                     setGroup(GROUP_APK_UPDATES)

@@ -34,6 +34,7 @@ class RemoteIndexSweep(
     private val provider: DownloadProvider,
     private val sourceManager: SourceManager,
     private val getFavorites: GetFavorites,
+    private val notifier: RemoteNotifier,
 ) {
 
     private val _state = MutableStateFlow<State>(State.Idle)
@@ -54,7 +55,17 @@ class RemoteIndexSweep(
      * blocking requests on the main thread.
      */
     suspend fun run() = withContext(Dispatchers.IO) {
-        if (!mirror.isEnabled) return@withContext
+        // An ongoing notification outlives the coroutine that posted it, so the
+        // dismissal has to survive cancellation too.
+        try {
+            sweep()
+        } finally {
+            notifier.dismissProgress()
+        }
+    }
+
+    private suspend fun sweep() {
+        if (!mirror.isEnabled) return
 
         // Dropped rather than merged: the point of running this is to stop
         // trusting what is already in there.
@@ -67,6 +78,7 @@ class RemoteIndexSweep(
 
         library.forEachIndexed { done, manga ->
             _state.value = State.Running(done, library.size, chapters)
+            notifier.sweepProgress(done, library.size, chapters)
 
             val source = sourceManager.getOrStub(manga.source)
             val count = index.refreshNow(
@@ -86,5 +98,6 @@ class RemoteIndexSweep(
             "Remote sweep: $chapters chapters across $series series, $unreachable unreachable"
         }
         _state.value = State.Done(series, chapters, unreachable)
+        notifier.sweepDone(series, chapters, unreachable)
     }
 }

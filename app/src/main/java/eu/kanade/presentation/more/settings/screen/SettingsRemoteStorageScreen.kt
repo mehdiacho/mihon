@@ -30,11 +30,12 @@ import mihon.app.di.appGraph
 import mihon.data.remote.EvictionTiming
 import mihon.data.remote.ManualDownloadKeep
 import mihon.data.remote.MirrorExistingDownloads
-import mihon.data.remote.RemoteMaintenance
 import mihon.data.remote.RedownloadSource
 import mihon.data.remote.RemoteHealth
 import mihon.data.remote.RemoteIndexSweep
+import mihon.data.remote.RemoteMaintenance
 import mihon.data.remote.RemoteRole
+import mihon.data.remote.formatBytes
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.pluralStringResource
@@ -364,13 +365,6 @@ object SettingsRemoteStorageScreen : SearchableSettings {
                     state.evicted,
                 )
             }
-    }
-
-    /** Whole GB or MB. A byte count to three decimal places is not information. */
-    private fun formatBytes(bytes: Long): String = when {
-        bytes >= 1024L * 1024 * 1024 -> "%.1f GB".format(bytes / (1024.0 * 1024 * 1024))
-        bytes >= 1024L * 1024 -> "%d MB".format(bytes / (1024 * 1024))
-        else -> "%d KB".format(bytes / 1024)
     }
 
     @Composable

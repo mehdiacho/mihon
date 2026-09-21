@@ -32,6 +32,7 @@ class MirrorExistingDownloads(
     private val mirror: RemoteMirror,
     private val index: RemoteIndex,
     private val maintenance: RemoteMaintenance,
+    private val notifier: RemoteNotifier,
 ) {
 
     private val _state = MutableStateFlow<State>(State.Idle)
@@ -68,15 +69,26 @@ class MirrorExistingDownloads(
      * per chapter swallowed into the failure count.
      */
     suspend fun run() = withContext(Dispatchers.IO) {
-        if (!mirror.isEnabled) return@withContext
+        // An ongoing notification outlives the coroutine that posted it, so the
+        // dismissal has to survive cancellation too.
+        try {
+            upload()
+        } finally {
+            notifier.dismissProgress()
+        }
+    }
 
-        val client = clientProvider.get() ?: return@withContext
-        val root = storageManager.getDownloadsDirectory() ?: return@withContext
+    private suspend fun upload() {
+        if (!mirror.isEnabled) return
+
+        val client = clientProvider.get() ?: return
+        val root = storageManager.getDownloadsDirectory() ?: return
 
         // Nothing from a previous run should decide what this one uploads.
         remoteListings.clear()
 
         _state.value = State.Scanning(0)
+        notifier.uploadScanning(0)
 
         // Collected up front so the total is known before the first upload;
         // a progress bar that discovers its own length is not a progress bar.
@@ -90,6 +102,10 @@ class MirrorExistingDownloads(
                     .forEach { file ->
                         candidates += Candidate(file, listOf(sourceName, mangaName, file.name!!))
                         _state.value = State.Scanning(candidates.size)
+                        // The shade drops notifications posted faster than a
+                        // few per second, so the count moves in steps rather
+                        // than per file.
+                        if (candidates.size % SCAN_NOTIFY_EVERY == 0) notifier.uploadScanning(candidates.size)
                     }
             }
         }
@@ -104,6 +120,7 @@ class MirrorExistingDownloads(
         // between a few hundred requests and a few thousand.
         candidates.forEachIndexed { i, candidate ->
             _state.value = State.Running(uploaded, skipped, failed, candidates.size, candidate.segments[1])
+            notifier.uploadProgress(uploaded + skipped + failed, candidates.size, candidate.segments[1])
 
             val (source, manga, chapter) = candidate.segments
             val dirKey = "$source/$manga"
@@ -148,11 +165,13 @@ class MirrorExistingDownloads(
 
             if (i == candidates.lastIndex) {
                 _state.value = State.Done(uploaded, skipped, failed, freed)
+                notifier.uploadDone(uploaded, skipped, failed, freed)
             }
         }
 
         if (candidates.isEmpty()) {
             _state.value = State.Done(0, 0, 0, 0L)
+            notifier.uploadDone(0, 0, 0, 0L)
         }
     }
 
@@ -164,4 +183,8 @@ class MirrorExistingDownloads(
     private val remoteListings = mutableMapOf<String, Map<String, Long>>()
 
     private data class Candidate(val file: UniFile, val segments: List<String>)
+
+    companion object {
+        private const val SCAN_NOTIFY_EVERY = 50
+    }
 }
