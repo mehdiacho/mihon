@@ -132,6 +132,23 @@ android {
             // "update" itself to an upstream APK it is not signed with.
             buildConfigField("boolean", "UPDATER_ENABLED", "false")
         }
+        // Same app as custom, with its own applicationId so it can hold a
+        // different library. custom carries a small library kept for exercising
+        // the remote storage feature; this one carries the real one restored
+        // from the upstream preview build, which is why they cannot be the same
+        // install.
+        create("temp") {
+            initWith(release)
+
+            applicationIdSuffix = ".temp"
+            versionNameSuffix = "-temp-${getLatestCommitCount()}"
+
+            matchingFallbacks.addAll(commonMatchingFallbacks)
+
+            buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLatestCommitTime = false)}\"")
+
+            buildConfigField("boolean", "UPDATER_ENABLED", "false")
+        }
         create("benchmark") {
             initWith(release)
 
