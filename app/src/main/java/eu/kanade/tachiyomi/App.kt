@@ -56,6 +56,7 @@ import mihon.app.di.injekt.MetroInjektRegistrar
 import mihon.core.metro.GraphProvider
 import mihon.core.migration.Migration
 import mihon.core.migration.Migrator
+import mihon.data.lansync.LanSyncServer
 import mihon.telemetry.TelemetryConfig
 import org.conscrypt.Conscrypt
 import tachiyomi.core.common.i18n.stringResource
@@ -94,6 +95,8 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
     @Inject private lateinit var widgetManager: WidgetManager
 
     @Inject private lateinit var migrations: Set<Migration>
+
+    @Inject private lateinit var lanSyncServer: LanSyncServer
 
     private val disableIncognitoReceiver = DisableIncognitoReceiver()
 
@@ -169,6 +172,8 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
         // Updates widget update
         widgetManager.init(scope)
+
+        lanSyncServer.bind(scope)
 
         if (!LogcatLogger.isInstalled) {
             val minLogPriority = when {

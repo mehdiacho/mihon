@@ -1194,4 +1194,18 @@
     <string name="restore_downloads_no">No</string>
     <string name="restore_trackers_title">Sign in to keep tracking</string>
     <string name="restore_trackers_sign_in">Your library is linked to %1$s, which this device isn\'t signed in to.</string>
+    <!-- LAN sync: let a device that restored this phone's backup pull its downloads -->
+    <string name="pref_category_lan_sync">LAN sync</string>
+    <string name="pref_lan_sync_summary">Let another device pull downloads from this phone</string>
+    <string name="pref_lan_sync_enable">Let other devices pull from this phone</string>
+    <string name="pref_lan_sync_enable_summary">Shares your downloaded chapters and a backup with devices on this network that have the pairing code</string>
+    <string name="pref_lan_sync_pairing">Pairing</string>
+    <string name="pref_lan_sync_code">Pairing code</string>
+    <string name="pref_lan_sync_new_code">New pairing code</string>
+    <string name="pref_lan_sync_new_code_summary">Devices using the old code will need the new one</string>
+    <string name="pref_lan_sync_address">Address</string>
+    <string name="pref_lan_sync_off">Not sharing</string>
+    <string name="pref_lan_sync_no_network">Port %1$d, but this phone isn't on a local network</string>
+    <string name="pref_lan_sync_failed">Couldn't start: %1$s</string>
+    <string name="pref_lan_sync_info">Keep Mihon open while another device pulls. Android can stop it in the background. After 5 wrong codes in a minute, pulls are refused for 5 minutes.</string>
 </resources>

@@ -43,6 +43,7 @@ import mihon.icons.materialsymbols.rounded.Info
 import mihon.icons.materialsymbols.rounded.Palette
 import mihon.icons.materialsymbols.rounded.Search
 import mihon.icons.materialsymbols.rounded.Security
+import mihon.icons.materialsymbols.rounded.Share
 import mihon.icons.materialsymbols.rounded.Storage
 import mihon.icons.materialsymbols.rounded.Sync
 import tachiyomi.i18n.MR
@@ -201,6 +202,12 @@ object SettingsMainScreen : Screen() {
             subtitleRes = MR.strings.pref_remote_storage_summary,
             icon = MaterialSymbols.Rounded.CloudUpload,
             screen = SettingsRemoteStorageScreen,
+        ),
+        Item(
+            titleRes = MR.strings.pref_category_lan_sync,
+            subtitleRes = MR.strings.pref_lan_sync_summary,
+            icon = MaterialSymbols.Rounded.Share,
+            screen = SettingsLanSyncScreen,
         ),
         Item(
             titleRes = MR.strings.pref_category_tracking,
