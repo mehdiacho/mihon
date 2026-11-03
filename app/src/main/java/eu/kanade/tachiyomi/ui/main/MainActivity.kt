@@ -560,6 +560,11 @@ class MainActivity : BaseActivity() {
                 navigator.push(SettingsScreen(SettingsScreen.Destination.Tracking))
                 null
             }
+            RestoreFollowUp.ACTION_RESTORE_NAS_PASSWORD -> {
+                navigator.popUntilRoot()
+                navigator.push(SettingsScreen(SettingsScreen.Destination.RemoteStorage))
+                null
+            }
             Intent.ACTION_APPLICATION_PREFERENCES -> {
                 navigator.popUntilRoot()
                 navigator.push(SettingsScreen())

@@ -328,6 +328,7 @@ dependencies {
     // Disk
     implementation(libs.diskLruCache)
     implementation(libs.unifile)
+    implementation(libs.bouncycastle.bcprov)
 
     // Preferences
     implementation(libs.androidx.preference)

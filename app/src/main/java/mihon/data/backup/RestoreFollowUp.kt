@@ -12,6 +12,7 @@ import eu.kanade.domain.base.BasePreferences
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.backup.models.BackupExtension
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
+import eu.kanade.tachiyomi.data.backup.models.BackupRemoteStorage
 import eu.kanade.tachiyomi.data.backup.models.BackupSource
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.notification.Notifications
@@ -31,6 +32,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import logcat.LogPriority
+import mihon.data.remote.RemoteRole
+import mihon.data.remote.RemoteStoragePreferences
 import rikka.shizuku.Shizuku
 import tachiyomi.core.common.i18n.pluralStringResource
 import tachiyomi.core.common.i18n.stringResource
@@ -62,6 +65,7 @@ class RestoreFollowUp(
     private val downloadManager: DownloadManager,
     private val getMangaByUrlAndSourceId: GetMangaByUrlAndSourceId,
     private val getChaptersByMangaId: GetChaptersByMangaId,
+    private val remoteStoragePreferences: RemoteStoragePreferences,
     private val json: Json,
 ) {
 
@@ -70,6 +74,7 @@ class RestoreFollowUp(
     private val dir get() = File(context.filesDir, "restore_follow_up").apply { mkdirs() }
     private val pendingExtensionsFile get() = File(dir, "extensions.json")
     private val pendingDownloadsFile get() = File(dir, "downloads.json")
+    private val pendingNasPasswordFile get() = File(dir, "nas_password.bin")
 
     // region Extensions
 
@@ -285,6 +290,61 @@ class RestoreFollowUp(
 
     // endregion
 
+    // region NAS connection
+
+    /**
+     * Fills in the NAS connection when this device has none, so a restore onto a fresh phone finds
+     * the downloads already on the server. One that is already set up is left alone.
+     *
+     * The password, if the backup carries one, stays sealed until the user types the passphrase it
+     * was sealed with, from the Remote storage settings.
+     */
+    fun restoreRemoteStorage(remote: BackupRemoteStorage) {
+        val prefs = remoteStoragePreferences
+        if (prefs.host.get().isBlank() && remote.host.isNotBlank()) {
+            prefs.host.set(remote.host)
+            prefs.port.set(remote.port?.toString().orEmpty())
+            remote.useHttps?.let { prefs.useHttps.set(it) }
+            prefs.folder.set(remote.folder.orEmpty())
+            prefs.username.set(remote.username.orEmpty())
+            remote.role?.let { name -> RemoteRole.entries.find { it.name == name } }?.let { prefs.role.set(it) }
+        }
+
+        val sealed = remote.encryptedPassword ?: return
+        if (prefs.password.get().isNotEmpty()) return
+        pendingNasPasswordFile.writeBytes(sealed)
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            action = ACTION_RESTORE_NAS_PASSWORD
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        notify(
+            id = ID_NAS_PASSWORD,
+            title = context.stringResource(MR.strings.restore_nas_password_title),
+            text = context.stringResource(MR.strings.restore_nas_password_text),
+        ) {
+            setContentIntent(PendingIntent.getActivity(context, ID_NAS_PASSWORD, intent, PENDING_FLAGS))
+        }
+    }
+
+    fun hasPendingNasPassword(): Boolean = pendingNasPasswordFile.isFile
+
+    /** False for a wrong passphrase; the sealed password stays so the user can try again. */
+    fun unlockNasPassword(passphrase: String): Boolean {
+        val sealed = pendingNasPasswordFile.takeIf { it.isFile }?.readBytes() ?: return false
+        val password = NasPasswordCipher.decrypt(sealed, passphrase) ?: return false
+        remoteStoragePreferences.password.set(password)
+        discardNasPassword()
+        return true
+    }
+
+    fun discardNasPassword() {
+        pendingNasPasswordFile.delete()
+        context.cancelNotification(ID_NAS_PASSWORD)
+    }
+
+    // endregion
+
     private fun notify(id: Int, title: String, text: String, block: NotificationCompat.Builder.() -> Unit) {
         val builder = context.notificationBuilder(Notifications.CHANNEL_BACKUP_RESTORE_COMPLETE) {
             setSmallIcon(R.drawable.ic_mihon)
@@ -323,10 +383,12 @@ class RestoreFollowUp(
     companion object {
         const val ACTION_INSTALL_EXTENSIONS = "mihon.restore.INSTALL_EXTENSIONS"
         const val ACTION_SIGN_IN_TRACKERS = "mihon.restore.SIGN_IN_TRACKERS"
+        const val ACTION_RESTORE_NAS_PASSWORD = "mihon.restore.NAS_PASSWORD"
 
         private const val ID_EXTENSIONS = -505
         private const val ID_DOWNLOADS = -506
         private const val ID_TRACKERS = -507
+        private const val ID_NAS_PASSWORD = -508
 
         private const val PENDING_FLAGS = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 

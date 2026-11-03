@@ -20,10 +20,12 @@ import eu.kanade.tachiyomi.data.backup.models.BackupExtension
 import eu.kanade.tachiyomi.data.backup.models.BackupExtensionStore
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.models.BackupPreference
+import eu.kanade.tachiyomi.data.backup.models.BackupRemoteStorage
 import eu.kanade.tachiyomi.data.backup.models.BackupSource
 import eu.kanade.tachiyomi.data.backup.models.BackupSourcePreferences
 import kotlinx.serialization.protobuf.ProtoBuf
 import logcat.LogPriority
+import mihon.data.remote.RemoteStoragePreferences
 import okio.buffer
 import okio.gzip
 import okio.sink
@@ -55,13 +57,14 @@ class BackupCreator(
     private val extensionsBackupCreator: ExtensionsBackupCreator,
     private val sourcesBackupCreator: SourcesBackupCreator,
     private val backupFileValidator: BackupFileValidator,
+    private val remoteStoragePreferences: RemoteStoragePreferences,
 ) {
     @AssistedFactory
     fun interface Factory {
         fun create(isAutoBackup: Boolean): BackupCreator
     }
 
-    suspend fun backup(uri: Uri, options: BackupOptions): String {
+    suspend fun backup(uri: Uri, options: BackupOptions, sealedNasPassword: ByteArray? = null): String {
         var file: UniFile? = null
         try {
             file = if (isAutoBackup) {
@@ -96,6 +99,7 @@ class BackupCreator(
                 backupExtensionStores = backupExtensionStores(options),
                 backupSourcePreferences = backupSourcePreferences(options),
                 backupExtensions = backupExtensions(options),
+                remoteStorage = backupRemoteStorage(options, sealedNasPassword),
             )
 
             val byteArray = parser.encodeToByteArray(Backup.serializer(), backup)
@@ -160,6 +164,21 @@ class BackupCreator(
         if (!options.extensions) return emptyList()
 
         return extensionsBackupCreator()
+    }
+
+    private fun backupRemoteStorage(options: BackupOptions, sealedNasPassword: ByteArray?): BackupRemoteStorage? {
+        if (!options.remoteStorage || !remoteStoragePreferences.isConfigured) return null
+
+        val prefs = remoteStoragePreferences
+        return BackupRemoteStorage(
+            host = prefs.host.get().trim(),
+            port = prefs.port.get().trim().toIntOrNull(),
+            useHttps = prefs.useHttps.get(),
+            folder = prefs.folder.get().trim().ifEmpty { null },
+            username = prefs.username.get().ifEmpty { null },
+            encryptedPassword = sealedNasPassword?.takeIf { options.remoteStoragePassword },
+            role = prefs.role.get().name,
+        )
     }
 
     private suspend fun backupSourcePreferences(options: BackupOptions): List<BackupSourcePreferences> {

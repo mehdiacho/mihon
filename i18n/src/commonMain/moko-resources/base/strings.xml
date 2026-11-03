@@ -1208,4 +1208,19 @@
     <string name="pref_lan_sync_no_network">Port %1$d, but this phone isn't on a local network</string>
     <string name="pref_lan_sync_failed">Couldn't start: %1$s</string>
     <string name="pref_lan_sync_info">Keep Mihon open while another device pulls. Android can stop it in the background. After 5 wrong codes in a minute, pulls are refused for 5 minutes.</string>
+    <!-- NAS connection in backups -->
+    <string name="backup_nas_connection">NAS connection</string>
+    <string name="backup_nas_password">NAS password, protected with a passphrase</string>
+    <string name="backup_nas_passphrase_title">Passphrase for the NAS password</string>
+    <string name="backup_nas_passphrase_text">You'll need this passphrase to get the NAS password back when you restore this backup. It isn't saved anywhere.</string>
+    <string name="backup_nas_passphrase">Passphrase</string>
+    <string name="backup_nas_passphrase_repeat">Repeat passphrase</string>
+    <string name="backup_nas_passphrase_short">Use at least 8 characters</string>
+    <string name="backup_nas_passphrase_mismatch">The passphrases don't match</string>
+    <string name="backup_nas_no_password">No NAS password is set, so there's none to include</string>
+    <string name="restore_nas_password_title">Restore the NAS password</string>
+    <string name="restore_nas_password_text">This backup includes the NAS password. Enter the passphrase it was protected with.</string>
+    <string name="restore_nas_password_wrong">That passphrase doesn't open it</string>
+    <string name="restore_nas_password_done">NAS password restored</string>
+    <string name="restore_nas_password_discard">Discard</string>
 </resources>

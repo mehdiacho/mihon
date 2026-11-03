@@ -15,6 +15,10 @@ data class BackupOptions(
     val sourceSettings: Boolean = true,
     val privateSettings: Boolean = false,
     val extensions: Boolean = true,
+    // Where the NAS is; never its password unless the option below is also on
+    val remoteStorage: Boolean = true,
+    // The NAS password, sealed with a passphrase asked for when the backup is made
+    val remoteStoragePassword: Boolean = false,
 ) {
 
     fun asBooleanArray() = booleanArrayOf(
@@ -29,6 +33,8 @@ data class BackupOptions(
         sourceSettings,
         privateSettings,
         extensions,
+        remoteStorage,
+        remoteStoragePassword,
     )
 
     fun canCreate() = libraryEntries || categories || appSettings || extensionStores || sourceSettings || extensions
@@ -88,6 +94,22 @@ data class BackupOptions(
                 setter = { options, enabled -> options.copy(extensions = enabled) },
             ),
             Entry(
+                label = MR.strings.backup_nas_connection,
+                getter = BackupOptions::remoteStorage,
+                setter = { options, enabled ->
+                    options.copy(
+                        remoteStorage = enabled,
+                        remoteStoragePassword = enabled && options.remoteStoragePassword,
+                    )
+                },
+            ),
+            Entry(
+                label = MR.strings.backup_nas_password,
+                getter = BackupOptions::remoteStoragePassword,
+                setter = { options, enabled -> options.copy(remoteStoragePassword = enabled) },
+                enabled = { it.remoteStorage },
+            ),
+            Entry(
                 label = MR.strings.source_settings,
                 getter = BackupOptions::sourceSettings,
                 setter = { options, enabled -> options.copy(sourceSettings = enabled) },
@@ -113,6 +135,8 @@ data class BackupOptions(
             privateSettings = array[9],
             // Absent from arrays saved before the option existed
             extensions = array.getOrElse(10) { true },
+            remoteStorage = array.getOrElse(11) { true },
+            remoteStoragePassword = array.getOrElse(12) { false },
         )
     }
 

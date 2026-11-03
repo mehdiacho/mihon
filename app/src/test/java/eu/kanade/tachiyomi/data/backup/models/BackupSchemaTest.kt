@@ -92,5 +92,34 @@ class BackupSchemaTest {
         assertTrue(proto.decodeFromByteArray(Backup.serializer(), old).backupExtensions.isEmpty())
     }
 
+    @Test
+    fun `NAS connection is tag 901 on a backup and round trips`() {
+        val remote = BackupRemoteStorage(
+            host = "nas.example.test",
+            port = 5006,
+            useHttps = true,
+            folder = "manga/preview",
+            username = "reader",
+            encryptedPassword = byteArrayOf(1, 2, 3),
+            role = "ARCHIVE",
+        )
+        val encoded = proto.encodeToByteArray(Backup.serializer(), Backup(emptyList(), remoteStorage = remote))
+
+        // (901 << 3) | 2, as a varint
+        assertEquals(listOf(0xAAu, 0x38u).map { it.toUByte() }, encoded.toUByteList().take(2))
+
+        val decoded = proto.decodeFromByteArray(Backup.serializer(), encoded).remoteStorage!!
+        assertEquals(remote.host, decoded.host)
+        assertEquals(remote.port, decoded.port)
+        assertEquals(remote.useHttps, decoded.useHttps)
+        assertEquals(remote.folder, decoded.folder)
+        assertEquals(remote.username, decoded.username)
+        assertEquals(remote.role, decoded.role)
+        assertTrue(remote.encryptedPassword!!.contentEquals(decoded.encryptedPassword))
+
+        val old = proto.encodeToByteArray(Backup.serializer(), Backup(emptyList()))
+        assertEquals(null, proto.decodeFromByteArray(Backup.serializer(), old).remoteStorage)
+    }
+
     private fun ByteArray.toUByteList() = map { it.toUByte() }
 }

@@ -1,10 +1,16 @@
 package eu.kanade.presentation.more.settings.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
@@ -17,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -132,6 +140,47 @@ object SettingsRemoteStorageScreen : SearchableSettings {
                             stringResource(MR.strings.pref_remote_storage_password_set)
                         },
                     ),
+                    Preference.PreferenceItem.CustomPreference(
+                        title = stringResource(MR.strings.restore_nas_password_title),
+                    ) {
+                        // Left by a restore whose backup carried the password sealed under a passphrase
+                        val followUp = remember { context.appGraph.restoreFollowUp }
+                        var pendingCheck by remember { mutableStateOf(0) }
+                        val sealedWaiting = remember(password, pendingCheck) { followUp.hasPendingNasPassword() }
+                        var asking by remember { mutableStateOf(false) }
+
+                        if (sealedWaiting) {
+                            TextPreferenceWidget(
+                                title = stringResource(MR.strings.restore_nas_password_title),
+                                subtitle = stringResource(MR.strings.restore_nas_password_text),
+                                onPreferenceClick = { asking = true },
+                            )
+                        }
+                        if (asking) {
+                            UnlockNasPasswordDialog(
+                                onDismissRequest = { asking = false },
+                                onDiscard = {
+                                    followUp.discardNasPassword()
+                                    asking = false
+                                    pendingCheck++
+                                },
+                                onUnlock = { passphrase ->
+                                    scope.launch {
+                                        val unlocked = withContext(Dispatchers.Default) {
+                                            followUp.unlockNasPassword(passphrase)
+                                        }
+                                        if (unlocked) {
+                                            asking = false
+                                            pendingCheck++
+                                            context.toast(MR.strings.restore_nas_password_done)
+                                        } else {
+                                            context.toast(MR.strings.restore_nas_password_wrong)
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                    },
                     Preference.PreferenceItem.CustomPreference(
                         title = stringResource(MR.strings.pref_remote_storage_folder),
                     ) {
@@ -456,4 +505,41 @@ private fun StatusDot(status: RemoteHealth.Status) {
                 .background(color, CircleShape),
         )
     }
+}
+
+@Composable
+private fun UnlockNasPasswordDialog(
+    onDismissRequest: () -> Unit,
+    onDiscard: () -> Unit,
+    onUnlock: (String) -> Unit,
+) {
+    var passphrase by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = { Text(stringResource(MR.strings.restore_nas_password_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(MR.strings.restore_nas_password_text))
+                OutlinedTextField(
+                    value = passphrase,
+                    onValueChange = { passphrase = it },
+                    label = { Text(stringResource(MR.strings.backup_nas_passphrase)) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = passphrase.isNotEmpty(), onClick = { onUnlock(passphrase) }) {
+                Text(stringResource(MR.strings.action_ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDiscard) {
+                Text(stringResource(MR.strings.restore_nas_password_discard))
+            }
+        },
+    )
 }

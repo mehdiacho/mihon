@@ -164,6 +164,9 @@ class BackupRestorer(
                 restoreFollowUp.promptTrackerSignIn(backup.backupManga)
                 restoreFollowUp.offerDownloads(backup.backupManga)
             }
+            if (options.appSettings) {
+                backup.remoteStorage?.let { restoreFollowUp.restoreRemoteStorage(it) }
+            }
         } catch (e: Exception) {
             // The data is already restored; a failure here only loses the offers that follow it
             logcat(LogPriority.ERROR, e) { "Restore follow-up failed" }
