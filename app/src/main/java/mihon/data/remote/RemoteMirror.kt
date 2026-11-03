@@ -209,6 +209,10 @@ class RemoteMirror(
     fun countFor(sourceDirName: String, mangaDirName: String): Int =
         index.countFor(sourceDirName, mangaDirName)
 
+    /** What the remote is already known to hold for a series. See [RemoteIndex.knownFor]. */
+    fun knownFor(sourceDirName: String, mangaDirName: String): Set<String>? =
+        if (isEnabled) index.knownFor(sourceDirName, mangaDirName) else null
+
     /** Whether the remote is known to hold this chapter. See [RemoteIndex.contains]. */
     fun holds(segments: List<String>): Boolean {
         if (segments.size < 3) return false

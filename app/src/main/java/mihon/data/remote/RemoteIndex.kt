@@ -157,6 +157,16 @@ class RemoteIndex(
         return chapterFileNames.firstOrNull { it in known }
     }
 
+    /**
+     * The chapter file names already known for a series, without going to the server for them.
+     * Null when remote storage is off or the series has not been listed yet; unlike [resolve],
+     * not knowing doesn't start a listing.
+     */
+    fun knownFor(sourceDirName: String, mangaDirName: String): Set<String>? {
+        if (!preferences.enabled.get()) return null
+        return entries[keyOf(sourceDirName, mangaDirName)]
+    }
+
     /** Whether the remote holds the chapter under any of [chapterFileNames]. */
     fun contains(sourceDirName: String, mangaDirName: String, chapterFileNames: List<String>): Boolean =
         resolve(sourceDirName, mangaDirName, chapterFileNames) != null
