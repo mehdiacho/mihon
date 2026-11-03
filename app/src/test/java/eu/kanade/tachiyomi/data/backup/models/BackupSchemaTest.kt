@@ -54,6 +54,18 @@ class BackupSchemaTest {
     }
 
     @Test
+    fun `on server is tag 901 and independent of downloaded`() {
+        val bytes = proto.encodeToByteArray(
+            BackupChapter.serializer(),
+            BackupChapter(url = "u", name = "n", onServer = true),
+        ).toUByteList()
+
+        // (901 << 3) | 0, then true; and nothing claiming it is on the device
+        assertTrue(bytes.windowed(3).contains(listOf(0xA8u, 0x38u, 0x01u).map { it.toUByte() }))
+        assertFalse(bytes.windowed(2).contains(listOf(0xA0u, 0x38u).map { it.toUByte() }))
+    }
+
+    @Test
     fun `round trips and reads backups without the new tags`() {
         val extension = BackupExtension(
             pkgName = "eu.kanade.tachiyomi.extension.en.example",

@@ -9,6 +9,7 @@ import eu.kanade.tachiyomi.data.backup.models.BackupHistory
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.models.backupChapterMapper
 import eu.kanade.tachiyomi.data.backup.models.backupTrackMapper
+import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.DownloadProvider
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import tachiyomi.data.Database
@@ -24,6 +25,7 @@ class MangaBackupCreator(
     private val getCategories: GetCategories,
     private val getHistory: GetHistory,
     private val downloadProvider: DownloadProvider,
+    private val downloadManager: DownloadManager,
     private val sourceManager: SourceManager,
 ) {
 
@@ -51,7 +53,7 @@ class MangaBackupCreator(
                 )
                 .awaitAsList()
                 .takeUnless(List<BackupChapter>::isEmpty)
-                ?.also { markDownloaded(manga, it) }
+                ?.also { markDownloadState(manga, it) }
                 ?.let { mangaObject.chapters = it }
         }
 
@@ -94,19 +96,24 @@ class MangaBackupCreator(
      * Read from the downloads folder rather than the download cache: the cache fills in the
      * background and a backup job can easily run before it has, which would record nothing as
      * downloaded. One listing per series keeps that affordable.
+     *
+     * The server copy is recorded separately and from the saved server index, without asking the
+     * server: an automatic backup asking once per series would be hundreds of requests.
      */
-    private suspend fun markDownloaded(manga: Manga, chapters: List<BackupChapter>) {
+    private suspend fun markDownloadState(manga: Manga, chapters: List<BackupChapter>) {
         val source = sourceManager.getOrStub(manga.source)
         val onDisk = downloadProvider.findMangaDir(manga.title, source)
             ?.listFiles()
             ?.mapNotNullTo(HashSet()) { it.name }
-            ?.takeIf { it.isNotEmpty() }
-            ?: return
+            .orEmpty()
 
         chapters.forEach { chapter ->
-            chapter.downloaded = downloadProvider
-                .getValidChapterDirNames(chapter.name, chapter.scanlator, chapter.url)
-                .any { it in onDisk }
+            if (onDisk.isNotEmpty()) {
+                chapter.downloaded = downloadProvider
+                    .getValidChapterDirNames(chapter.name, chapter.scanlator, chapter.url)
+                    .any { it in onDisk }
+            }
+            chapter.onServer = downloadManager.isChapterOnRemote(chapter.toChapterImpl(), manga, source)
         }
     }
 }
