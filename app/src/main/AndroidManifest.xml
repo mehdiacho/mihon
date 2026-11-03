@@ -204,6 +204,10 @@
             android:name=".data.notification.NotificationReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name="mihon.data.backup.RestoreFollowUpReceiver"
+            android:exported="false" />
+
         <service
             android:name=".extension.util.ExtensionInstallService"
             android:exported="false"

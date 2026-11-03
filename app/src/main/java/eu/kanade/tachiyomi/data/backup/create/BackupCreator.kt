@@ -10,11 +10,13 @@ import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.data.backup.BackupFileValidator
 import eu.kanade.tachiyomi.data.backup.create.creators.CategoriesBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.ExtensionStoresBackupCreator
+import eu.kanade.tachiyomi.data.backup.create.creators.ExtensionsBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.MangaBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.PreferenceBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.SourcesBackupCreator
 import eu.kanade.tachiyomi.data.backup.models.Backup
 import eu.kanade.tachiyomi.data.backup.models.BackupCategory
+import eu.kanade.tachiyomi.data.backup.models.BackupExtension
 import eu.kanade.tachiyomi.data.backup.models.BackupExtensionStore
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.models.BackupPreference
@@ -50,6 +52,7 @@ class BackupCreator(
     private val mangaBackupCreator: MangaBackupCreator,
     private val preferenceBackupCreator: PreferenceBackupCreator,
     private val extensionStoresBackupCreator: ExtensionStoresBackupCreator,
+    private val extensionsBackupCreator: ExtensionsBackupCreator,
     private val sourcesBackupCreator: SourcesBackupCreator,
     private val backupFileValidator: BackupFileValidator,
 ) {
@@ -92,6 +95,7 @@ class BackupCreator(
                 backupPreferences = backupAppPreferences(options),
                 backupExtensionStores = backupExtensionStores(options),
                 backupSourcePreferences = backupSourcePreferences(options),
+                backupExtensions = backupExtensions(options),
             )
 
             val byteArray = parser.encodeToByteArray(Backup.serializer(), backup)
@@ -150,6 +154,12 @@ class BackupCreator(
         if (!options.extensionStores) return emptyList()
 
         return extensionStoresBackupCreator()
+    }
+
+    private suspend fun backupExtensions(options: BackupOptions): List<BackupExtension> {
+        if (!options.extensions) return emptyList()
+
+        return extensionsBackupCreator()
     }
 
     private suspend fun backupSourcePreferences(options: BackupOptions): List<BackupSourcePreferences> {

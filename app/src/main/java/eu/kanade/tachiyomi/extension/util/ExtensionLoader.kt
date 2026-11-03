@@ -210,6 +210,13 @@ internal object ExtensionLoader {
         return getExtensionInfoFromPkgName(context, pkgName)?.packageInfo
     }
 
+    /**
+     * The fingerprint trust is decided on, in the same form as an extension store's signing key.
+     */
+    fun getSignatureHash(context: Context, pkgName: String): String? {
+        return getExtensionPackageInfoFromPkgName(context, pkgName)?.let(::getSignatures)?.lastOrNull()
+    }
+
     private fun getExtensionInfoFromPkgName(context: Context, pkgName: String): ExtensionInfo? {
         val privateExtensionFile = File(getPrivateExtensionDir(context), "$pkgName.$PRIVATE_EXTENSION_EXTENSION")
         val privatePkg = if (privateExtensionFile.isFile) {

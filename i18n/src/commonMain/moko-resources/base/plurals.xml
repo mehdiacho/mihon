@@ -118,4 +118,12 @@
         <item quantity="one">Local copies are removed %d day after they reach the server</item>
         <item quantity="other">Local copies are removed %d days after they reach the server</item>
     </plurals>
+    <plurals name="restore_extensions_missing">
+        <item quantity="one">%d extension your library uses isn\'t installed here.</item>
+        <item quantity="other">%d extensions your library uses aren\'t installed here.</item>
+    </plurals>
+    <plurals name="restore_downloads_offer">
+        <item quantity="one">%d chapter was downloaded on the other device. Download it here?</item>
+        <item quantity="other">%d chapters were downloaded on the other device. Download them here?</item>
+    </plurals>
 </resources>

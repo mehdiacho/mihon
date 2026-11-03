@@ -26,6 +26,8 @@ class BackupChapter(
     @ProtoNumber(11) var lastModifiedAt: Long = 0,
     @ProtoNumber(12) var version: Long = 0,
     @ProtoNumber(13) var memo: ByteArray = JsonObjectEmptyBytes,
+    // Whether the chapter was on disk where the backup was made. Only ever acted on by asking.
+    @ProtoNumber(900) var downloaded: Boolean = false,
 ) {
     fun toChapterImpl(): Chapter {
         return Chapter.create().copy(

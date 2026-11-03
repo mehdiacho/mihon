@@ -108,6 +108,7 @@ import mihon.app.di.AppGraph
 import mihon.app.di.appGraph
 import mihon.core.metro.metroGraph
 import mihon.core.migration.Migrator
+import mihon.data.backup.RestoreFollowUp
 import mihon.feature.support.SupportUsScreen
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.automirroredrounded.OpenInNew
@@ -548,6 +549,16 @@ class MainActivity : BaseActivity() {
             Constants.SHORTCUT_DOWNLOADS -> {
                 navigator.popUntilRoot()
                 HomeScreen.Tab.More(toDownloads = true)
+            }
+            RestoreFollowUp.ACTION_INSTALL_EXTENSIONS -> {
+                appGraph.restoreFollowUp.installPending()
+                HomeScreen.Tab.Browse(true)
+            }
+            RestoreFollowUp.ACTION_SIGN_IN_TRACKERS -> {
+                appGraph.restoreFollowUp.dismissTrackerPrompt()
+                navigator.popUntilRoot()
+                navigator.push(SettingsScreen(SettingsScreen.Destination.Tracking))
+                null
             }
             Intent.ACTION_APPLICATION_PREFERENCES -> {
                 navigator.popUntilRoot()

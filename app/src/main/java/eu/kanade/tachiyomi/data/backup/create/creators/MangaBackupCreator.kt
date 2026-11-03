@@ -9,18 +9,22 @@ import eu.kanade.tachiyomi.data.backup.models.BackupHistory
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.models.backupChapterMapper
 import eu.kanade.tachiyomi.data.backup.models.backupTrackMapper
+import eu.kanade.tachiyomi.data.download.DownloadProvider
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import tachiyomi.data.Database
 import tachiyomi.data.MemoColumnAdapter
 import tachiyomi.domain.category.interactor.GetCategories
 import tachiyomi.domain.history.interactor.GetHistory
 import tachiyomi.domain.manga.model.Manga
+import tachiyomi.domain.source.service.SourceManager
 
 @Inject
 class MangaBackupCreator(
     private val database: Database,
     private val getCategories: GetCategories,
     private val getHistory: GetHistory,
+    private val downloadProvider: DownloadProvider,
+    private val sourceManager: SourceManager,
 ) {
 
     suspend operator fun invoke(mangas: List<Manga>, options: BackupOptions): List<BackupManga> {
@@ -47,6 +51,7 @@ class MangaBackupCreator(
                 )
                 .awaitAsList()
                 .takeUnless(List<BackupChapter>::isEmpty)
+                ?.also { markDownloaded(manga, it) }
                 ?.let { mangaObject.chapters = it }
         }
 
@@ -83,6 +88,26 @@ class MangaBackupCreator(
         }
 
         return mangaObject
+    }
+
+    /**
+     * Read from the downloads folder rather than the download cache: the cache fills in the
+     * background and a backup job can easily run before it has, which would record nothing as
+     * downloaded. One listing per series keeps that affordable.
+     */
+    private suspend fun markDownloaded(manga: Manga, chapters: List<BackupChapter>) {
+        val source = sourceManager.getOrStub(manga.source)
+        val onDisk = downloadProvider.findMangaDir(manga.title, source)
+            ?.listFiles()
+            ?.mapNotNullTo(HashSet()) { it.name }
+            ?.takeIf { it.isNotEmpty() }
+            ?: return
+
+        chapters.forEach { chapter ->
+            chapter.downloaded = downloadProvider
+                .getValidChapterDirNames(chapter.name, chapter.scanlator, chapter.url)
+                .any { it in onDisk }
+        }
     }
 }
 

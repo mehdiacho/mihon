@@ -1184,4 +1184,14 @@
     <string name="pref_remote_storage_manual_keep_none">Treat it like any other download</string>
     <string name="remote_storage_fetching_progress">Fetching from server\u2026 %1$s of %2$s</string>
     <string name="remote_storage_chapter_on_server">Kept on the server</string>
+    <string name="backup_installed_extensions">Installed extensions</string>
+    <string name="restore_extension_not_in_stores">Extension %1$s isn\'t in any of the restored stores</string>
+    <string name="restore_extension_signer_differs">Extension %1$s is signed by someone other than its store, so it wasn\'t installed</string>
+    <string name="restore_extensions_title">Extensions from your backup</string>
+    <string name="restore_install_all">Install all</string>
+    <string name="restore_downloads_title">Downloads from your backup</string>
+    <string name="restore_downloads_unread_only">Unread only</string>
+    <string name="restore_downloads_no">No</string>
+    <string name="restore_trackers_title">Sign in to keep tracking</string>
+    <string name="restore_trackers_sign_in">Your library is linked to %1$s, which this device isn\'t signed in to.</string>
 </resources>

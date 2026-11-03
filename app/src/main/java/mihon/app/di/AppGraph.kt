@@ -43,6 +43,7 @@ import eu.kanade.tachiyomi.util.CrashLogUtil
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
 import mihon.core.metro.IsDebugBuild
+import mihon.data.backup.RestoreFollowUp
 import mihon.data.remote.MirrorExistingDownloads
 import mihon.data.remote.RemoteClientProvider
 import mihon.data.remote.RemoteHealth
@@ -112,6 +113,7 @@ interface AppGraph : ViewModelGraph {
     val mirrorExistingDownloads: MirrorExistingDownloads
     val remoteIndexSweep: RemoteIndexSweep
     val remoteMaintenance: RemoteMaintenance
+    val restoreFollowUp: RestoreFollowUp
 
     val crashLogUtil: CrashLogUtil
 

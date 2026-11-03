@@ -7,6 +7,7 @@ import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
 import eu.kanade.tachiyomi.data.backup.BackupDecoder
 import eu.kanade.tachiyomi.data.backup.BackupNotifier
+import eu.kanade.tachiyomi.data.backup.models.Backup
 import eu.kanade.tachiyomi.data.backup.models.BackupCategory
 import eu.kanade.tachiyomi.data.backup.models.BackupExtensionStore
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
@@ -24,6 +25,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import logcat.LogPriority
+import mihon.data.backup.RestoreFollowUp
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.data.Database
@@ -50,6 +52,7 @@ class BackupRestorer(
     private val extensionStoreRestorer: ExtensionStoreRestorer,
     private val mangaRestorer: MangaRestorer,
     private val backupDecoder: BackupDecoder,
+    private val restoreFollowUp: RestoreFollowUp,
 ) {
 
     @AssistedFactory
@@ -144,6 +147,27 @@ class BackupRestorer(
             }
 
             // TODO: optionally trigger online library + tracker update
+        }
+
+        // After the scope above, so the stores are in place to install from and the library is
+        // in place to queue downloads against
+        if (!isSync) restoreFollowUp(backup, options)
+    }
+
+    private suspend fun restoreFollowUp(backup: Backup, options: RestoreOptions) {
+        try {
+            if (options.extensions) {
+                restoreFollowUp.restoreExtensions(backup.backupExtensions, backup.backupSources)
+                    .forEach { errors.add(Date() to it) }
+            }
+            if (options.libraryEntries) {
+                restoreFollowUp.promptTrackerSignIn(backup.backupManga)
+                restoreFollowUp.offerDownloads(backup.backupManga)
+            }
+        } catch (e: Exception) {
+            // The data is already restored; a failure here only loses the offers that follow it
+            logcat(LogPriority.ERROR, e) { "Restore follow-up failed" }
+            errors.add(Date() to "Restore follow-up: ${e.message}")
         }
     }
 
