@@ -48,6 +48,7 @@ class LanSyncServer(
     private val catalog: LanSyncCatalog,
     private val links: LanSyncLinks,
     private val queue: LanSyncQueue,
+    private val receiver: LanSyncReceiver,
 ) {
 
     sealed interface State {
@@ -157,6 +158,7 @@ class LanSyncServer(
                 request == null -> respondJson(out, 400, LanSyncProtocol.Error("bad request"))
                 request.path == "/link" -> link(request, client, out)
                 request.path in KEYED_ROUTES -> keyed(request, client, out)
+                request.path == "/file" && request.method == "PUT" -> keyed(request, client, out)
                 request.method != "GET" -> respondJson(out, 405, LanSyncProtocol.Error("GET only"))
                 request.path == "/ping" -> respondJson(
                     out,
@@ -188,6 +190,7 @@ class LanSyncServer(
                 else -> serve(request, out)
             }
             out.flush()
+            finishGracefully(client)
         } catch (e: IOException) {
             // The other side went away mid-transfer; nothing to tell it
             logcat(LogPriority.DEBUG, e) { "LAN sync connection ended" }
@@ -196,6 +199,27 @@ class LanSyncServer(
             runCatching {
                 respondJson(out, 500, LanSyncProtocol.Error("server error"))
                 out.flush()
+            }
+        }
+    }
+
+    /**
+     * Closing with request bytes still unread makes the OS send a reset, and a reset can reach the
+     * client before the response it just sent: an upload refused early would then look like a
+     * dropped connection instead of a 400. So half-close, and discard what's left of the body,
+     * up to a limit and a short deadline, before the socket is closed.
+     */
+    private fun finishGracefully(client: Socket) {
+        runCatching {
+            client.shutdownOutput()
+            client.soTimeout = DRAIN_TIMEOUT_MS
+            val input = client.getInputStream()
+            val buffer = ByteArray(16 * 1024)
+            var left = DRAIN_MAX_BYTES
+            while (left > 0) {
+                val n = input.read(buffer, 0, minOf(buffer.size.toLong(), left).toInt())
+                if (n < 0) break
+                left -= n
             }
         }
     }
@@ -263,13 +287,21 @@ class LanSyncServer(
         }
         client.inetAddress?.hostAddress?.let { links.touch(link, withPort(it, link.lastAddress)) }
 
-        val expected = if (request.path == "/queue") "GET" else "POST"
+        val expected = when (request.path) {
+            "/queue" -> "GET"
+            "/file" -> "PUT"
+            else -> "POST"
+        }
         if (request.method != expected) {
             respondJson(out, 405, LanSyncProtocol.Error("$expected only"))
             return
         }
         if (request.path == "/queue") {
             respondJson(out, 200, queue.items())
+            return
+        }
+        if (request.path == "/file") {
+            upload(request, client, out)
             return
         }
 
@@ -311,6 +343,33 @@ class LanSyncServer(
             }
         }
     }
+
+    /** `PUT /file`: a chapter the PC downloaded for this phone. Streams to a `.part`, then renames. */
+    private fun upload(request: LanSyncProtocol.Request, client: Socket, out: OutputStream) {
+        val target = LanSyncUpload.parseTarget(request.query["path"].orEmpty())
+        if (target == null) {
+            respondJson(out, 400, LanSyncProtocol.Error("path must be downloads/<source>/<manga>/<chapter>.cbz"))
+            return
+        }
+        val length = LanSyncUpload.parseLength(request.header("content-length"))
+        if (length == null) {
+            respondJson(out, 400, LanSyncProtocol.Error("needs a Content-Length of at most 1 GiB"))
+            return
+        }
+        // A big chapter over Wi-Fi can pause for longer than a request head should
+        client.soTimeout = UPLOAD_READ_TIMEOUT_MS
+        when (val result = runBlocking { receiver.receive(target, length, client.getInputStream()) }) {
+            LanSyncReceiver.Result.Written -> respondJson(out, 200, UploadResult("written"))
+            LanSyncReceiver.Result.AlreadyHere -> respondJson(out, 200, UploadResult("kept existing"))
+            LanSyncReceiver.Result.UnknownChapter ->
+                respondJson(out, 404, LanSyncProtocol.Error("no chapter here by that name"))
+            is LanSyncReceiver.Result.BadBody -> respondJson(out, 400, LanSyncProtocol.Error(result.reason))
+            is LanSyncReceiver.Result.Failed -> respondJson(out, 500, LanSyncProtocol.Error(result.reason))
+        }
+    }
+
+    @kotlinx.serialization.Serializable
+    private data class UploadResult(val result: String)
 
     /** Keeps the port the device said it serves on, since the one it connects from is ephemeral. */
     private fun withPort(host: String, previous: String?): String {
@@ -390,6 +449,9 @@ class LanSyncServer(
     private companion object {
         const val MAX_CONNECTIONS = 4
         const val READ_TIMEOUT_MS = 30_000
+        const val UPLOAD_READ_TIMEOUT_MS = 120_000
+        const val DRAIN_TIMEOUT_MS = 2_000
+        const val DRAIN_MAX_BYTES = 1024L * 1024
         val AUTHED_ROUTES = setOf("/manifest", "/backup", "/file")
         val KEYED_ROUTES = setOf("/queue", "/queue/claim", "/queue/release", "/downloads/done")
     }
