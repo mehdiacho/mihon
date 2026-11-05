@@ -43,6 +43,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import logcat.LogPriority
 import mihon.core.archive.ZipWriter
+import mihon.data.lansync.RemoteQueueStore
+import mihon.data.remote.RemoteMirror
+import mihon.data.remote.remoteChapterFileNames
 import nl.adaptivity.xmlutil.serialization.XML
 import okhttp3.Response
 import tachiyomi.core.common.i18n.stringResource
@@ -83,6 +86,8 @@ class Downloader(
     private val getTracks: GetTracks,
     private val store: DownloadStore,
     private val notifier: DownloadNotifier,
+    private val remoteMirror: RemoteMirror,
+    private val remoteQueue: RemoteQueueStore,
 ) {
     /**
      * Queue where active downloads are kept.
@@ -127,6 +132,9 @@ class Downloader(
         pending.forEach { if (it.status != Download.State.QUEUE) it.status = Download.State.QUEUE }
 
         isPaused = false
+
+        // Everything left is being downloaded by a linked PC: nothing for this phone to do
+        if (pending.all { remoteQueue.isClaimed(it) }) return false
 
         launchDownloaderJob()
 
@@ -189,11 +197,14 @@ class Downloader(
             val activeDownloadsFlow = combine(
                 queueState,
                 downloadPreferences.parallelSourceLimit.changes(),
-            ) { a, b -> a to b }.transformLatest { (queue, parallelCount) ->
+                remoteQueue.state,
+            ) { a, b, c -> Triple(a, b, c) }.transformLatest { (queue, parallelCount, remote) ->
                 while (true) {
                     val activeDownloads = queue.asSequence()
                         // Ignore completed downloads, leave them in the queue
                         .filter { it.status.value <= Download.State.DOWNLOADING.value }
+                        // A linked PC is downloading these; they stay queued here, paused
+                        .filter { !remoteQueue.isClaimed(it, remote) }
                         .groupBy { it.source }
                         .toList()
                         .take(parallelCount)
@@ -339,6 +350,15 @@ class Downloader(
             download.chapter.scanlator,
             download.chapter.url,
         )
+
+        // A chapter that is already on the server does not need to be pulled
+        // from the source again: the archive is identical, the LAN is faster,
+        // and it spares the scanlation site a download it has already served.
+        if (restoreFromRemote(download, mangaDir, chapterDirname)) {
+            download.status = Download.State.DOWNLOADED
+            return
+        }
+
         val tmpDir = mangaDir.createDirectory(chapterDirname + TMP_DIR_SUFFIX)!!
 
         try {
@@ -384,6 +404,17 @@ class Downloader(
             // Do after download completes
 
             if (!isDownloadSuccessful(download, tmpDir)) {
+                // The only failure in this function that produced neither a log
+                // line nor a notification: the chapter row showed an error and
+                // nothing anywhere said why. It is also the branch a resumed
+                // download lands in after the process was killed mid-chapter,
+                // so it is worth saying what did not add up.
+                logcat(LogPriority.ERROR) {
+                    val failed = download.pages.orEmpty().count { it.status is Page.State.Error }
+                    "Download of ${download.chapter.name} incomplete: " +
+                        "${download.downloadedImages}/${download.pages?.size} pages ready, " +
+                        "$failed failed, ${tmpDir.listFiles().orEmpty().size} files in ${tmpDir.name}"
+                }
                 download.status = Download.State.ERROR
                 return
             }
@@ -402,6 +433,14 @@ class Downloader(
                 tmpDir.renameTo(chapterDirname)
             }
             cache.addChapter(chapterDirname, mangaDir, download.manga)
+
+            // Hand the finished archive to the remote mirror. Fire-and-forget:
+            // the download is complete and correct whether or not it uploads.
+            // Only the CBZ path is mirrored -- a loose page directory is not a
+            // single file and is not what the remote is for.
+            if (downloadPreferences.saveChaptersAsCBZ.get()) {
+                mirrorChapter(mangaDir, chapterDirname, download)
+            }
 
             DiskUtil.createNoMediaFile(tmpDir, context)
 
@@ -447,7 +486,7 @@ class Downloader(
             }
 
             // When the page is ready, set page path, progress (just in case) and status
-            splitTallImageIfNeeded(page, tmpDir)
+            splitTallImageIfNeeded(page, tmpDir, filename)
 
             page.uri = file.uri
             page.progress = 100
@@ -541,18 +580,38 @@ class Downloader(
         return ImageUtil.getExtensionFromMimeType(mime) { file.openInputStream() }
     }
 
-    private fun splitTallImageIfNeeded(page: Page, tmpDir: UniFile) {
+    private fun splitTallImageIfNeeded(page: Page, tmpDir: UniFile, filenamePrefix: String) {
         if (!downloadPreferences.splitTallImages.get()) return
 
         try {
-            val filenamePrefix = "%03d".format(Locale.ENGLISH, page.number)
-            val imageFile = tmpDir.listFiles()?.firstOrNull { it.name.orEmpty().startsWith(filenamePrefix) }
-                ?: error(context.stringResource(MR.strings.download_notifier_split_page_not_found, page.number))
+            // The prefix the file was actually named with, rather than a second
+            // guess at its width: getOrDownloadImage sizes it to the page count,
+            // so in a chapter of a thousand pages page 1 is 0001 and not 001.
+            // Matching is anchored on what follows the number for the same
+            // reason a bare prefix was wrong there -- "001" is a prefix of
+            // "0010", so page 1 would otherwise find page 10's image and split
+            // that instead. A half-written .tmp is not this page either.
+            val files = tmpDir.listFiles().orEmpty().filter {
+                val name = it.name.orEmpty()
+                !name.endsWith(".tmp") &&
+                    (name.startsWith("$filenamePrefix.") || name.startsWith("${filenamePrefix}__"))
+            }
+            if (files.isEmpty()) {
+                error(context.stringResource(MR.strings.download_notifier_split_page_not_found, page.number))
+            }
 
-            // If the original page was previously split, then skip
-            if (imageFile.name.orEmpty().startsWith("${filenamePrefix}__")) return
+            // The unsplit page, if it is still here. splitTallImage deletes the
+            // original as its last step, so the original still being present
+            // means a previous split did not finish -- the process was killed
+            // part way through, say -- and the parts beside it cannot be
+            // trusted. Deciding "already split" from the presence of a part, as
+            // this did before, leaves the original sitting next to them; the
+            // page is then counted twice by isDownloadSuccessful and the
+            // chapter fails forever with every one of its pages downloaded.
+            val original = files.firstOrNull { !it.name.orEmpty().startsWith("${filenamePrefix}__") }
+                ?: return
 
-            ImageUtil.splitTallImage(tmpDir, imageFile, filenamePrefix)
+            ImageUtil.splitTallImage(tmpDir, original, filenamePrefix)
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "Failed to split downloaded image" }
         }
@@ -601,6 +660,70 @@ class Downloader(
             fileName.startsWith("$pagePrefix.") ||
                 fileName.startsWith("${pagePrefix}__001.")
             )
+
+    /**
+     * Copies the chapter back from the remote instead of downloading it, when
+     * the user has asked for that and the remote actually has it.
+     *
+     * Returns false for every other case, including failure, so the caller
+     * falls through to an ordinary download. A remote that is unreachable must
+     * degrade to the normal path, not to an error.
+     */
+    private suspend fun restoreFromRemote(download: Download, mangaDir: UniFile, chapterDirname: String): Boolean {
+        if (!remoteMirror.isEnabled || !remoteMirror.redownloadFromRemote) return false
+
+        return try {
+            val chapter = download.chapter
+            val segments = remoteMirror.segmentsFor(
+                sourceDirName = provider.getSourceDirName(download.source),
+                mangaDirName = provider.getMangaDirName(download.manga.title),
+                chapterFileNames = provider.remoteChapterFileNames(chapter.name, chapter.scanlator, chapter.url),
+            )
+
+            val fetched = remoteMirror.fetch(segments) ?: return false
+
+            // Copied rather than moved: the fetch cache is shared with the
+            // reader, and moving it out from under a chapter being read would
+            // break it.
+            // Written under the current name whatever the server called it:
+            // the local tree is what DownloadCache reads.
+            val target = mangaDir.createFile(RemoteMirror.chapterFileName(chapterDirname)) ?: return false
+            fetched.inputStream().use { input ->
+                target.openOutputStream().use { output -> input.copyTo(output) }
+            }
+
+            cache.addChapter(chapterDirname, mangaDir, download.manga)
+            true
+        } catch (e: Throwable) {
+            logcat(LogPriority.WARN, e) { "Could not restore ${download.chapter.name} from remote" }
+            false
+        }
+    }
+
+    /**
+     * Queues the finished CBZ for upload to the remote mirror, if one is
+     * configured. Never throws: a mirroring problem must not turn a successful
+     * download into a failed one.
+     */
+    private fun mirrorChapter(mangaDir: UniFile, chapterDirname: String, download: Download) {
+        if (!remoteMirror.isEnabled) return
+        try {
+            val archive = mangaDir.findFile(RemoteMirror.chapterFileName(chapterDirname)) ?: return
+            val chapter = download.chapter
+            remoteMirror.enqueue(
+                file = archive,
+                segments = remoteMirror.segmentsFor(
+                    sourceDirName = provider.getSourceDirName(download.source),
+                    mangaDirName = provider.getMangaDirName(download.manga.title),
+                    chapterFileNames = provider.remoteChapterFileNames(chapter.name, chapter.scanlator, chapter.url),
+                ),
+                chapterId = download.chapter.id,
+                mangaId = download.manga.id,
+            )
+        } catch (e: Throwable) {
+            logcat(LogPriority.ERROR, e) { "Failed to queue chapter for remote mirror" }
+        }
+    }
 
     /**
      * Archive the chapter pages as a CBZ.
@@ -657,7 +780,9 @@ class Downloader(
      * Returns true if all the queued downloads are in DOWNLOADED or ERROR state.
      */
     private fun areAllDownloadsFinished(): Boolean {
-        return queueState.value.none { it.status.value <= Download.State.DOWNLOADING.value }
+        return queueState.value.none {
+            it.status.value <= Download.State.DOWNLOADING.value && !remoteQueue.isClaimed(it)
+        }
     }
 
     private fun addAllToQueue(downloads: List<Download>) {

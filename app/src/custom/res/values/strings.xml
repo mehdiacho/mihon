@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Overrides the value from the :i18n module so all three installs have
+         distinct launcher labels. -->
+    <string name="app_name" translatable="false">Mihon Custom</string>
+</resources>

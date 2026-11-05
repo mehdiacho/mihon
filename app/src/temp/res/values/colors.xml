@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Green-on-charcoal. Stable is dark blue on white, preview light blue on
+         slate, custom amber on charcoal; this one carries the real library. -->
+    <color name="accent_blue">#4CAF50</color>
+    <color name="icon_background">#131C16</color>
+</resources>

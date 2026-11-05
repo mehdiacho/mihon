@@ -12,6 +12,7 @@ import android.graphics.Paint
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.text.format.Formatter
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -137,6 +138,8 @@ class ReaderActivity : BaseActivity() {
     private val windowInsetsController by lazy { WindowInsetsControllerCompat(window, window.decorView) }
 
     private var loadingIndicator: ReaderProgressIndicator? = null
+
+    private val remoteMirror by lazy { graph.remoteMirror }
 
     var isScrollingThroughPages = false
         private set
@@ -277,6 +280,12 @@ class ReaderActivity : BaseActivity() {
         val onDismissRequest = viewModel::closeDialog
         when (state.dialog) {
             is ReaderViewModel.Dialog.Loading -> {
+                // A chapter held only on the remote server is a transfer of a
+                // hundred megabytes or so, not a page request. An indeterminate
+                // spinner for that long is indistinguishable from a hang, so
+                // when a fetch is running the dialog says what it is waiting on
+                // and how far it has got.
+                val fetch by remoteMirror.activeFetch.collectAsState()
                 AlertDialog(
                     onDismissRequest = {},
                     confirmButton = {},
@@ -285,8 +294,23 @@ class ReaderActivity : BaseActivity() {
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            CircularProgressIndicator()
-                            Text(stringResource(MR.strings.loading))
+                            val progress = fetch
+                                ?.takeIf { it.total > 0 }
+                                ?.let { it.bytesRead.toFloat() / it.total }
+                            if (progress != null) {
+                                CircularProgressIndicator(progress = { progress })
+                            } else {
+                                CircularProgressIndicator()
+                            }
+                            Text(
+                                text = fetch?.let {
+                                    stringResource(
+                                        MR.strings.remote_storage_fetching_progress,
+                                        Formatter.formatShortFileSize(this@ReaderActivity, it.bytesRead),
+                                        Formatter.formatShortFileSize(this@ReaderActivity, it.total),
+                                    )
+                                } ?: stringResource(MR.strings.loading),
+                            )
                         }
                     },
                 )

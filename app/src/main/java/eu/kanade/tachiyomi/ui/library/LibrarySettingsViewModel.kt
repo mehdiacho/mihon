@@ -10,6 +10,7 @@ import eu.kanade.domain.base.BasePreferences
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import mihon.data.remote.RemoteMirror
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.TriState
 import tachiyomi.core.common.preference.getAndSet
@@ -31,7 +32,14 @@ class LibrarySettingsViewModel(
     private val setDisplayMode: SetDisplayMode,
     private val setSortModeForCategory: SetSortModeForCategory,
     trackerManager: TrackerManager,
+    remoteMirror: RemoteMirror,
 ) : ViewModel() {
+
+    /**
+     * Whether to offer the server badge and filter at all. Read once: turning
+     * mirroring on is a trip to another screen, which closes this dialog.
+     */
+    val mirroringEnabled: Boolean = remoteMirror.isEnabled
 
     val trackersFlow = trackerManager.loggedInTrackersFlow()
         .stateIn(

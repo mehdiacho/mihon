@@ -5,6 +5,8 @@ import tachiyomi.domain.library.model.LibraryManga
 data class LibraryItem(
     val libraryManga: LibraryManga,
     val downloadCount: Int,
+    val remoteCount: Int,
+    val deviceCount: Int,
     val unreadCount: Long,
     val isLocal: Boolean,
     val sourceName: String,
@@ -15,6 +17,8 @@ data class LibraryItem(
 
     data class Badges(
         val downloadCount: Int,
+        val remoteCount: Int,
+        val deviceCount: Int,
         val unreadCount: Long,
         val isLocal: Boolean,
         val sourceLanguage: String,

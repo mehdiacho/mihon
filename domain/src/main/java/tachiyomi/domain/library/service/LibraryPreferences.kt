@@ -78,6 +78,19 @@ class LibraryPreferences(
         TriState.DISABLED,
     )
 
+    /**
+     * Separate from [filterDownloaded] rather than folded into it.
+     *
+     * "Downloaded" means present on this device, and a chapter mirrored to a
+     * server and evicted is deliberately not that. Combining the two would
+     * make "Downloaded" stop meaning "available offline", which is what it is
+     * usually asked for.
+     */
+    val filterRemote: Preference<TriState> = preferenceStore.getEnum(
+        "pref_filter_library_remote",
+        TriState.DISABLED,
+    )
+
     val filterUnread: Preference<TriState> = preferenceStore.getEnum("pref_filter_library_unread_v2", TriState.DISABLED)
 
     val filterStarted: Preference<TriState> = preferenceStore.getEnum(
@@ -110,6 +123,9 @@ class LibraryPreferences(
     // region Badges
 
     val downloadBadge: Preference<Boolean> = preferenceStore.getBoolean("display_download_badge", false)
+
+    /** Chapters the remote server holds, whether or not they are on the device. */
+    val remoteBadge: Preference<Boolean> = preferenceStore.getBoolean("display_remote_badge", false)
 
     val unreadBadge: Preference<Boolean> = preferenceStore.getBoolean("display_unread_badge", true)
 

@@ -10,18 +10,22 @@ import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.data.backup.BackupFileValidator
 import eu.kanade.tachiyomi.data.backup.create.creators.CategoriesBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.ExtensionStoresBackupCreator
+import eu.kanade.tachiyomi.data.backup.create.creators.ExtensionsBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.MangaBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.PreferenceBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.SourcesBackupCreator
 import eu.kanade.tachiyomi.data.backup.models.Backup
 import eu.kanade.tachiyomi.data.backup.models.BackupCategory
+import eu.kanade.tachiyomi.data.backup.models.BackupExtension
 import eu.kanade.tachiyomi.data.backup.models.BackupExtensionStore
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.models.BackupPreference
+import eu.kanade.tachiyomi.data.backup.models.BackupRemoteStorage
 import eu.kanade.tachiyomi.data.backup.models.BackupSource
 import eu.kanade.tachiyomi.data.backup.models.BackupSourcePreferences
 import kotlinx.serialization.protobuf.ProtoBuf
 import logcat.LogPriority
+import mihon.data.remote.RemoteStoragePreferences
 import okio.buffer
 import okio.gzip
 import okio.sink
@@ -50,15 +54,17 @@ class BackupCreator(
     private val mangaBackupCreator: MangaBackupCreator,
     private val preferenceBackupCreator: PreferenceBackupCreator,
     private val extensionStoresBackupCreator: ExtensionStoresBackupCreator,
+    private val extensionsBackupCreator: ExtensionsBackupCreator,
     private val sourcesBackupCreator: SourcesBackupCreator,
     private val backupFileValidator: BackupFileValidator,
+    private val remoteStoragePreferences: RemoteStoragePreferences,
 ) {
     @AssistedFactory
     fun interface Factory {
         fun create(isAutoBackup: Boolean): BackupCreator
     }
 
-    suspend fun backup(uri: Uri, options: BackupOptions): String {
+    suspend fun backup(uri: Uri, options: BackupOptions, sealedNasPassword: ByteArray? = null): String {
         var file: UniFile? = null
         try {
             file = if (isAutoBackup) {
@@ -92,6 +98,8 @@ class BackupCreator(
                 backupPreferences = backupAppPreferences(options),
                 backupExtensionStores = backupExtensionStores(options),
                 backupSourcePreferences = backupSourcePreferences(options),
+                backupExtensions = backupExtensions(options),
+                remoteStorage = backupRemoteStorage(options, sealedNasPassword),
             )
 
             val byteArray = parser.encodeToByteArray(Backup.serializer(), backup)
@@ -150,6 +158,27 @@ class BackupCreator(
         if (!options.extensionStores) return emptyList()
 
         return extensionStoresBackupCreator()
+    }
+
+    private suspend fun backupExtensions(options: BackupOptions): List<BackupExtension> {
+        if (!options.extensions) return emptyList()
+
+        return extensionsBackupCreator()
+    }
+
+    private fun backupRemoteStorage(options: BackupOptions, sealedNasPassword: ByteArray?): BackupRemoteStorage? {
+        if (!options.remoteStorage || !remoteStoragePreferences.isConfigured) return null
+
+        val prefs = remoteStoragePreferences
+        return BackupRemoteStorage(
+            host = prefs.host.get().trim(),
+            port = prefs.port.get().trim().toIntOrNull(),
+            useHttps = prefs.useHttps.get(),
+            folder = prefs.folder.get().trim().ifEmpty { null },
+            username = prefs.username.get().ifEmpty { null },
+            encryptedPassword = sealedNasPassword?.takeIf { options.remoteStoragePassword },
+            role = prefs.role.get().name,
+        )
     }
 
     private suspend fun backupSourcePreferences(options: BackupOptions): List<BackupSourcePreferences> {

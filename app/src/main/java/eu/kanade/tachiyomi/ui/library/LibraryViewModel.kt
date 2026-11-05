@@ -40,9 +40,12 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import mihon.core.common.utils.mutate
+import mihon.data.lansync.DeviceHoldingsStore
+import mihon.data.remote.RemoteIndex
 import mihon.domain.library.model.search.QueryNode
 import mihon.feature.library.matches
 import tachiyomi.core.common.preference.CheckboxState
@@ -90,6 +93,8 @@ class LibraryViewModel(
     private val libraryPreferences: LibraryPreferences,
     private val coverCache: CoverCache,
     private val sourceManager: SourceManager,
+    private val remoteIndex: RemoteIndex,
+    private val deviceHoldings: DeviceHoldingsStore,
     private val downloadManager: DownloadManager,
     private val downloadCache: DownloadCache,
     private val trackerManager: TrackerManager,
@@ -116,6 +121,7 @@ class LibraryViewModel(
     ) { prefs, trackFilters ->
         listOf(
             prefs.filterDownloaded,
+            prefs.filterRemote,
             prefs.filterUnread,
             prefs.filterStarted,
             prefs.filterBookmarked,
@@ -209,6 +215,7 @@ class LibraryViewModel(
         val downloadedOnly = preferences.globalFilterDownloaded
         val skipOutsideReleasePeriod = preferences.skipOutsideReleasePeriod
         val filterDownloaded = if (downloadedOnly) TriState.ENABLED_IS else preferences.filterDownloaded
+        val filterRemote = preferences.filterRemote
         val filterUnread = preferences.filterUnread
         val filterStarted = preferences.filterStarted
         val filterBookmarked = preferences.filterBookmarked
@@ -223,6 +230,10 @@ class LibraryViewModel(
 
         val filterFnDownloaded: (LibraryItem) -> Boolean = {
             applyFilter(filterDownloaded) { it.isLocal || it.downloadCount > 0 }
+        }
+
+        val filterFnRemote: (LibraryItem) -> Boolean = {
+            applyFilter(filterRemote) { it.remoteCount > 0 }
         }
 
         val filterFnUnread: (LibraryItem) -> Boolean = {
@@ -262,6 +273,7 @@ class LibraryViewModel(
 
         return fastFilter {
             filterFnDownloaded(it) &&
+                filterFnRemote(it) &&
                 filterFnUnread(it) &&
                 filterFnStarted(it) &&
                 filterFnBookmarked(it) &&
@@ -369,6 +381,7 @@ class LibraryViewModel(
     private fun getLibraryItemPreferencesFlow(): Flow<ItemPreferences> {
         return combine(
             libraryPreferences.downloadBadge.changes(),
+            libraryPreferences.remoteBadge.changes(),
             libraryPreferences.unreadBadge.changes(),
             libraryPreferences.localBadge.changes(),
             libraryPreferences.languageBadge.changes(),
@@ -376,6 +389,7 @@ class LibraryViewModel(
 
             preferences.downloadedOnly.changes(),
             libraryPreferences.filterDownloaded.changes(),
+            libraryPreferences.filterRemote.changes(),
             libraryPreferences.filterUnread.changes(),
             libraryPreferences.filterStarted.changes(),
             libraryPreferences.filterBookmarked.changes(),
@@ -384,17 +398,19 @@ class LibraryViewModel(
         ) {
             ItemPreferences(
                 downloadBadge = it[0] as Boolean,
-                unreadBadge = it[1] as Boolean,
-                localBadge = it[2] as Boolean,
-                languageBadge = it[3] as Boolean,
-                skipOutsideReleasePeriod = LibraryPreferences.MANGA_OUTSIDE_RELEASE_PERIOD in (it[4] as Set<*>),
-                globalFilterDownloaded = it[5] as Boolean,
-                filterDownloaded = it[6] as TriState,
-                filterUnread = it[7] as TriState,
-                filterStarted = it[8] as TriState,
-                filterBookmarked = it[9] as TriState,
-                filterCompleted = it[10] as TriState,
-                filterIntervalCustom = it[11] as TriState,
+                remoteBadge = it[1] as Boolean,
+                unreadBadge = it[2] as Boolean,
+                localBadge = it[3] as Boolean,
+                languageBadge = it[4] as Boolean,
+                skipOutsideReleasePeriod = LibraryPreferences.MANGA_OUTSIDE_RELEASE_PERIOD in (it[5] as Set<*>),
+                globalFilterDownloaded = it[6] as Boolean,
+                filterDownloaded = it[7] as TriState,
+                filterRemote = it[8] as TriState,
+                filterUnread = it[9] as TriState,
+                filterStarted = it[10] as TriState,
+                filterBookmarked = it[11] as TriState,
+                filterCompleted = it[12] as TriState,
+                filterIntervalCustom = it[13] as TriState,
             )
         }
     }
@@ -404,11 +420,19 @@ class LibraryViewModel(
             getLibraryManga.subscribe(),
             getLibraryItemPreferencesFlow(),
             downloadCache.changes,
-        ) { libraryManga, preferences, _ ->
+            // onStart because the index may not have emitted yet, and combine
+            // waits for every source: without it the library would not render
+            // at all until something touched the server.
+            remoteIndex.changes.onStart { emit(Unit) },
+            deviceHoldings.index,
+        ) { libraryManga, preferences, _, _, devices ->
             libraryManga.map { manga ->
+                val deviceCount = devices.count(manga.manga.source, manga.manga.url)
                 LibraryItem(
                     libraryManga = manga,
                     downloadCount = downloadManager.getDownloadCount(manga.manga),
+                    remoteCount = downloadManager.getRemoteCount(manga.manga),
+                    deviceCount = deviceCount,
                     unreadCount = manga.unreadCount,
                     isLocal = manga.manga.isLocal(),
                     sourceName = sourceManager.getOrStub(manga.manga.source).name.lowercase(),
@@ -419,6 +443,13 @@ class LibraryViewModel(
                         } else {
                             0
                         },
+                        remoteCount = if (preferences.remoteBadge) {
+                            downloadManager.getRemoteCount(manga.manga)
+                        } else {
+                            0
+                        },
+                        // Under the downloads toggle: these are downloads, just on another device
+                        deviceCount = if (preferences.downloadBadge) deviceCount else 0,
                         unreadCount = if (preferences.unreadBadge) {
                             manga.unreadCount
                         } else {
@@ -496,12 +527,13 @@ class LibraryViewModel(
             DownloadAction.NEXT_10_CHAPTERS -> downloadNextChapters(10)
             DownloadAction.NEXT_25_CHAPTERS -> downloadNextChapters(25)
             DownloadAction.UNREAD_CHAPTERS -> downloadNextChapters(null)
+            DownloadAction.UNREAD_NOT_ON_SERVER -> downloadNextChapters(null, skipOnRemote = true)
             DownloadAction.BOOKMARKED_CHAPTERS -> downloadBookmarkedChapters()
         }
         clearSelection()
     }
 
-    private fun downloadNextChapters(amount: Int?) {
+    private fun downloadNextChapters(amount: Int?, skipOnRemote: Boolean = false) {
         val mangas = selectedManga
         viewModelScope.launchNonCancellable {
             mangas.forEach { manga ->
@@ -515,6 +547,12 @@ class LibraryViewModel(
                                 manga.title,
                                 manga.source,
                             )
+                    }
+                    // After the local filter, so the server is asked about at
+                    // most one series per selected manga rather than per chapter.
+                    .let {
+                        if (!skipOnRemote) return@let it
+                        downloadManager.filterNotOnRemote(it, manga, sourceManager.getOrStub(manga.source))
                     }
                     .let { if (amount != null) it.take(amount) else it }
 
@@ -768,6 +806,7 @@ class LibraryViewModel(
     @Immutable
     private data class ItemPreferences(
         val downloadBadge: Boolean,
+        val remoteBadge: Boolean,
         val unreadBadge: Boolean,
         val localBadge: Boolean,
         val languageBadge: Boolean,
@@ -775,6 +814,7 @@ class LibraryViewModel(
 
         val globalFilterDownloaded: Boolean,
         val filterDownloaded: TriState,
+        val filterRemote: TriState,
         val filterUnread: TriState,
         val filterStarted: TriState,
         val filterBookmarked: TriState,

@@ -69,6 +69,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import logcat.LogPriority
+import mihon.data.lansync.DeviceHoldingsStore
+import mihon.data.remote.RemoteMirror
+import mihon.data.remote.remoteChapterFileNames
 import tachiyomi.core.common.preference.toggle
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.launchNonCancellable
@@ -121,6 +124,8 @@ class ReaderViewModel(
     private val coverCache: CoverCache,
     private val chapterCache: ChapterCache,
     private val downloadCache: DownloadCache,
+    private val remoteMirror: RemoteMirror,
+    private val deviceHoldings: DeviceHoldingsStore,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -326,7 +331,16 @@ class ReaderViewModel(
                 mutableState.update { it.copy(manga = manga, source = source) }
                 if (chapterId == -1L) chapterId = initialChapterId
 
-                loader = ChapterLoader(context, downloadManager, downloadProvider, chapterCache, manga, source)
+                loader = ChapterLoader(
+                    context,
+                    downloadManager,
+                    downloadProvider,
+                    chapterCache,
+                    manga,
+                    source,
+                    remoteMirror,
+                    deviceHoldings,
+                )
 
                 loadChapter(loader!!, chapterList.first { chapterId == it.chapter.id })
             } catch (e: Throwable) {
@@ -493,9 +507,46 @@ class ReaderViewModel(
         val inDownloadRange = page.number.toDouble() / pages.size > 0.25
         if (inDownloadRange) {
             downloadNextChapters()
+            prefetchMirroredChapters()
         }
 
         eventChannel.trySend(Event.PageChanged)
+    }
+
+    /**
+     * Warms the remote mirror's cache with the chapters just ahead of the one
+     * being read, so that reaching a chapter which lives on the server does not
+     * mean waiting for a download.
+     *
+     * Deliberately not gated on the current chapter already being downloaded,
+     * unlike [downloadNextChapters]: this costs no permanent storage, and it is
+     * most useful precisely when chapters are not held locally.
+     */
+    private fun prefetchMirroredChapters() {
+        if (!remoteMirror.isEnabled) return
+        val count = remoteMirror.readAheadCount
+        if (count == 0) return
+        val manga = manga ?: return
+        val nextChapter = state.value.viewerChapters?.nextChapter?.chapter ?: return
+
+        viewModelScope.launchIO {
+            val upcoming = getNextChapters.await(manga.id, nextChapter.id!!).take(count)
+            val sourceDirName = downloadProvider.getSourceDirName(sourceManager.getOrStub(manga.source))
+            val mangaDirName = downloadProvider.getMangaDirName(manga.title)
+            (listOfNotNull(nextChapter.toDomainChapter()) + upcoming).forEach { chapter ->
+                remoteMirror.prefetch(
+                    remoteMirror.segmentsFor(
+                        sourceDirName = sourceDirName,
+                        mangaDirName = mangaDirName,
+                        chapterFileNames = downloadProvider.remoteChapterFileNames(
+                            chapter.name,
+                            chapter.scanlator,
+                            chapter.url,
+                        ),
+                    ),
+                )
+            }
+        }
     }
 
     private fun downloadNextChapters() {

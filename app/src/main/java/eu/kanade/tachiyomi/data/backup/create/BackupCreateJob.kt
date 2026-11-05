@@ -62,7 +62,8 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
             ?: BackupOptions()
 
         return try {
-            val location = backupCreatorFactory.create(isAutoBackup = isAutoBackup).backup(uri, options)
+            val location = backupCreatorFactory.create(isAutoBackup = isAutoBackup)
+                .backup(uri, options, sealedNasPassword = inputData.getByteArray(SEALED_NAS_PASSWORD_KEY))
             if (!isAutoBackup) {
                 notifier.showBackupComplete(UniFile.fromUri(context, location.toUri())!!)
             }
@@ -123,11 +124,16 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
             }
         }
 
-        fun startNow(context: Context, uri: Uri, options: BackupOptions) {
+        /**
+         * [sealedNasPassword] is already sealed with the user's passphrase, so it is safe to sit in
+         * WorkManager's database until the job runs. The passphrase itself never reaches here.
+         */
+        fun startNow(context: Context, uri: Uri, options: BackupOptions, sealedNasPassword: ByteArray? = null) {
             val inputData = workDataOf(
                 IS_AUTO_BACKUP_KEY to false,
                 LOCATION_URI_KEY to uri.toString(),
                 OPTIONS_KEY to options.asBooleanArray(),
+                SEALED_NAS_PASSWORD_KEY to sealedNasPassword,
             )
             val request = OneTimeWorkRequestBuilder<BackupCreateJob>()
                 .addTag(TAG_MANUAL)
@@ -144,3 +150,4 @@ private const val TAG_MANUAL = "$TAG_AUTO:manual"
 private const val IS_AUTO_BACKUP_KEY = "is_auto_backup" // Boolean
 private const val LOCATION_URI_KEY = "location_uri" // String
 private const val OPTIONS_KEY = "options" // BooleanArray
+private const val SEALED_NAS_PASSWORD_KEY = "sealed_nas_password" // ByteArray

@@ -108,6 +108,7 @@ import mihon.app.di.AppGraph
 import mihon.app.di.appGraph
 import mihon.core.metro.metroGraph
 import mihon.core.migration.Migrator
+import mihon.data.backup.RestoreFollowUp
 import mihon.feature.support.SupportUsScreen
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.automirroredrounded.OpenInNew
@@ -290,6 +291,18 @@ class MainActivity : BaseActivity() {
                 chapterCache.clear()
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // A linked PC may have finished chapters from this phone's queue while it was away
+        appGraph.lanSyncQueue.catchUpSoon()
+        appGraph.lanSyncQueue.watch(true)
+    }
+
+    override fun onStop() {
+        appGraph.lanSyncQueue.watch(false)
+        super.onStop()
     }
 
     override fun onProvideAssistContent(outContent: AssistContent) {
@@ -548,6 +561,21 @@ class MainActivity : BaseActivity() {
             Constants.SHORTCUT_DOWNLOADS -> {
                 navigator.popUntilRoot()
                 HomeScreen.Tab.More(toDownloads = true)
+            }
+            RestoreFollowUp.ACTION_INSTALL_EXTENSIONS -> {
+                appGraph.restoreFollowUp.installPending()
+                HomeScreen.Tab.Browse(true)
+            }
+            RestoreFollowUp.ACTION_SIGN_IN_TRACKERS -> {
+                appGraph.restoreFollowUp.dismissTrackerPrompt()
+                navigator.popUntilRoot()
+                navigator.push(SettingsScreen(SettingsScreen.Destination.Tracking))
+                null
+            }
+            RestoreFollowUp.ACTION_RESTORE_NAS_PASSWORD -> {
+                navigator.popUntilRoot()
+                navigator.push(SettingsScreen(SettingsScreen.Destination.RemoteStorage))
+                null
             }
             Intent.ACTION_APPLICATION_PREFERENCES -> {
                 navigator.popUntilRoot()

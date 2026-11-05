@@ -34,6 +34,7 @@ import eu.kanade.presentation.util.LocalBackPress
 import eu.kanade.presentation.util.Screen
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.automirroredrounded.ChromeReaderMode
+import mihon.icons.materialsymbols.rounded.CloudUpload
 import mihon.icons.materialsymbols.rounded.Code
 import mihon.icons.materialsymbols.rounded.CollectionsBookmark
 import mihon.icons.materialsymbols.rounded.Download
@@ -42,6 +43,7 @@ import mihon.icons.materialsymbols.rounded.Info
 import mihon.icons.materialsymbols.rounded.Palette
 import mihon.icons.materialsymbols.rounded.Search
 import mihon.icons.materialsymbols.rounded.Security
+import mihon.icons.materialsymbols.rounded.Share
 import mihon.icons.materialsymbols.rounded.Storage
 import mihon.icons.materialsymbols.rounded.Sync
 import tachiyomi.i18n.MR
@@ -194,6 +196,18 @@ object SettingsMainScreen : Screen() {
             subtitleRes = MR.strings.pref_downloads_summary,
             icon = MaterialSymbols.Rounded.Download,
             screen = SettingsDownloadScreen,
+        ),
+        Item(
+            titleRes = MR.strings.pref_category_remote_storage,
+            subtitleRes = MR.strings.pref_remote_storage_summary,
+            icon = MaterialSymbols.Rounded.CloudUpload,
+            screen = SettingsRemoteStorageScreen,
+        ),
+        Item(
+            titleRes = MR.strings.pref_category_lan_sync,
+            subtitleRes = MR.strings.pref_lan_sync_summary,
+            icon = MaterialSymbols.Rounded.Share,
+            screen = SettingsLanSyncScreen,
         ),
         Item(
             titleRes = MR.strings.pref_category_tracking,

@@ -98,3 +98,58 @@ fun Badge(
         style = MaterialTheme.typography.bodySmall,
     )
 }
+
+/**
+ * An icon and a number in one badge.
+ *
+ * Two badges of bare numbers side by side are only told apart by their colour,
+ * which is not something to ask of a badge four millimetres wide.
+ */
+@Composable
+fun Badge(
+    text: String,
+    imageVector: ImageVector,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.secondary,
+    textColor: Color = MaterialTheme.colorScheme.onSecondary,
+    iconColor: Color = textColor,
+    shape: Shape = RectangleShape,
+) {
+    val iconContentPlaceholder = "[icon]"
+    val annotated = buildAnnotatedString {
+        appendInlineContent(iconContentPlaceholder)
+        append(" ")
+        append(text)
+    }
+    val inlineContent = mapOf(
+        Pair(
+            iconContentPlaceholder,
+            InlineTextContent(
+                Placeholder(
+                    width = MaterialTheme.typography.bodySmall.fontSize,
+                    height = MaterialTheme.typography.bodySmall.fontSize,
+                    placeholderVerticalAlign = PlaceholderVerticalAlign.Center,
+                ),
+            ) {
+                Icon(
+                    imageVector = imageVector,
+                    tint = iconColor,
+                    contentDescription = null,
+                )
+            },
+        ),
+    )
+
+    Text(
+        text = annotated,
+        inlineContent = inlineContent,
+        modifier = modifier
+            .clip(shape)
+            .background(color)
+            .padding(horizontal = 3.dp, vertical = 1.dp),
+        color = textColor,
+        fontWeight = FontWeight.Medium,
+        maxLines = 1,
+        style = MaterialTheme.typography.bodySmall,
+    )
+}

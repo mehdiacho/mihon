@@ -72,6 +72,12 @@ android {
         }
     }
 
+    // AGP only makes unit tests for this build type. CI runs testDebugUnitTest, so the
+    // default stays debug; -PdevTests moves them to customDev for the local loop.
+    if (project.hasProperty("devTests")) {
+        testBuildType = "customDev"
+    }
+
     buildTypes {
         val debug = getByName("debug") {
             applicationIdSuffix = ".dev"
@@ -111,6 +117,63 @@ android {
 
             buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLatestCommitTime = false)}\"")
         }
+        // Personal daily-driver build. Installs alongside upstream stable (app.mihon)
+        // and preview (app.mihon.debug) instead of replacing either, and picks up the
+        // amber launcher icon from src/custom/res. Signed with the local Android debug
+        // key, which is fine because this applicationId has never been installed under
+        // any other key -- see docs/fork.md.
+        create("custom") {
+            initWith(release)
+
+            applicationIdSuffix = ".custom"
+            versionNameSuffix = "-custom-${getLatestCommitCount()}"
+
+            matchingFallbacks.addAll(commonMatchingFallbacks)
+
+            buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLatestCommitTime = false)}\"")
+
+            // Mihon's fork guidelines ask forks to change or disable the update
+            // checker. It already defaults to off, but that is a -P property
+            // anyone could pass by accident, and this build must never offer to
+            // "update" itself to an upstream APK it is not signed with.
+            buildConfigField("boolean", "UPDATER_ENABLED", "false")
+        }
+        // custom without R8, for the edit-install loop on the phone. It has its own
+        // applicationId: installed over custom, the unminified host made custom crash in
+        // ART while loading its private extensions (SIGSEGV in LZ4_decompress_safe, on
+        // every launch), so the two must never share an install. BUILD_TIME is the commit time, so BuildConfig doesn't change between edits and
+        // force a wider recompile. With -PdevTests the unit tests run on it as well
+        // (testCustomDevUnitTest), sharing the compile with the APK instead of compiling
+        // the debug variant too. Build custom itself before committing, since R8 is what
+        // breaks serialization.
+        create("customDev") {
+            initWith(getByName("custom"))
+
+            isMinifyEnabled = false
+            isShrinkResources = false
+
+            applicationIdSuffix = ".customdev"
+            versionNameSuffix = "-customdev-${getLatestCommitCount()}"
+
+            buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLatestCommitTime = true)}\"")
+        }
+        // Same app as custom, with its own applicationId so it can hold a
+        // different library. custom carries a small library kept for exercising
+        // the remote storage feature; this one carries the real one restored
+        // from the upstream preview build, which is why they cannot be the same
+        // install.
+        create("temp") {
+            initWith(release)
+
+            applicationIdSuffix = ".temp"
+            versionNameSuffix = "-temp-${getLatestCommitCount()}"
+
+            matchingFallbacks.addAll(commonMatchingFallbacks)
+
+            buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLatestCommitTime = false)}\"")
+
+            buildConfigField("boolean", "UPDATER_ENABLED", "false")
+        }
         create("benchmark") {
             initWith(release)
 
@@ -128,10 +191,20 @@ android {
 
     splits {
         abi {
+            // Upstream ships five APKs. Only arm64-v8a is ever installed on the one
+            // device this fork targets, and building the rest (plus the universal APK,
+            // which bundles every ABI) is most of the wall-clock cost of a build.
+            // Pass -PallAbis to restore the full upstream matrix -- needed when
+            // producing artifacts for an upstream PR, not for day-to-day builds.
+            val allAbis = project.hasProperty("allAbis")
             isEnable = true
-            isUniversalApk = true
+            isUniversalApk = allAbis
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            if (allAbis) {
+                include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            } else {
+                include("arm64-v8a")
+            }
         }
     }
 
@@ -280,6 +353,9 @@ dependencies {
     // Disk
     implementation(libs.diskLruCache)
     implementation(libs.unifile)
+    implementation(libs.bouncycastle.bcprov)
+    // Fork: scans a TachiMana link QR code; Play Services owns the camera, so no permission here
+    implementation(libs.play.services.code.scanner)
 
     // Preferences
     implementation(libs.androidx.preference)

@@ -11,6 +11,8 @@ import eu.kanade.tachiyomi.data.download.model.Download
 class DownloadItem(
     val download: Download,
     header: DownloadHeaderItem,
+    /** The linked PC downloading this instead of the phone, if any. */
+    val claimedBy: String? = null,
 ) : AbstractSectionableItem<DownloadHolder, DownloadHeaderItem>(header) {
 
     override fun getLayoutRes(): Int {
@@ -44,7 +46,7 @@ class DownloadItem(
         position: Int,
         payloads: MutableList<Any>,
     ) {
-        holder.bind(download)
+        holder.bind(download, claimedBy)
     }
 
     /**

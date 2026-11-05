@@ -57,6 +57,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import logcat.LogPriority
+import mihon.data.lansync.DeviceHoldingsStore
+import mihon.data.remote.RemoteIndex
 import mihon.domain.chapter.interactor.FilterChaptersForDownload
 import mihon.domain.source.interactor.UpdateMangaFromRemote
 import tachiyomi.core.common.i18n.stringResource
@@ -102,6 +104,8 @@ class MangaViewModel(
     private val trackerManager: TrackerManager,
     private val trackChapter: TrackChapter,
     private val downloadManager: DownloadManager,
+    private val remoteIndex: RemoteIndex,
+    private val deviceHoldings: DeviceHoldingsStore,
     private val downloadCache: DownloadCache,
     private val getMangaAndChapters: GetMangaWithChapters,
     private val getDuplicateLibraryManga: GetDuplicateLibraryManga,
@@ -180,6 +184,48 @@ class MangaViewModel(
     }
 
     init {
+        // The remote index fills in lazily, one directory at a time, so the
+        // first render of a chapter list cannot know what the server holds.
+        // Re-derive the flags whenever it learns something rather than blocking
+        // the list on a network round trip.
+        viewModelScope.launchIO {
+            remoteIndex.changes.collectLatest {
+                updateSuccessState { state ->
+                    state.copy(
+                        chapters = state.chapters.map { item ->
+                            item.copy(
+                                isOnRemote = downloadManager.isChapterOnRemote(
+                                    item.chapter,
+                                    state.manga,
+                                    state.source,
+                                ),
+                                isKeptOnDevice = downloadManager.isChapterKeptOnDevice(
+                                    item.chapter,
+                                    state.manga,
+                                    state.source,
+                                ),
+                            )
+                        },
+                    )
+                }
+            }
+        }
+
+        // What linked computers hold changes when one is reached or reports a download
+        viewModelScope.launchIO {
+            deviceHoldings.index.collectLatest { index ->
+                updateSuccessState { state ->
+                    state.copy(
+                        chapters = state.chapters.map { item ->
+                            item.copy(
+                                onDevices = index.deviceNames(state.manga.source, state.manga.url, item.chapter.url),
+                            )
+                        },
+                    )
+                }
+            }
+        }
+
         viewModelScope.launchIO {
             combine(
                 getMangaAndChapters.subscribe(mangaId, applyScanlatorFilter = true).distinctUntilChanged(),
@@ -190,7 +236,7 @@ class MangaViewModel(
                     updateSuccessState {
                         it.copy(
                             manga = manga,
-                            chapters = chapters.toChapterListItems(manga),
+                            chapters = chapters.toChapterListItems(manga, it.source),
                         )
                     }
                 }
@@ -220,8 +266,9 @@ class MangaViewModel(
 
         viewModelScope.launchIO {
             val manga = getMangaAndChapters.awaitManga(mangaId)
+            val source = sourceManager.getOrStub(manga.source)
             val chapters = getMangaAndChapters.awaitChapters(mangaId, applyScanlatorFilter = true)
-                .toChapterListItems(manga)
+                .toChapterListItems(manga, source)
 
             if (!manga.favorite) {
                 setMangaDefaultChapterFlags.await(manga)
@@ -234,7 +281,7 @@ class MangaViewModel(
             state.update {
                 State.Success(
                     manga = manga,
-                    source = sourceManager.getOrStub(manga.source),
+                    source = source,
                     isFromSource = isFromSource,
                     chapters = chapters,
                     availableScanlators = getAvailableScanlators.await(mangaId),
@@ -541,8 +588,9 @@ class MangaViewModel(
         }
     }
 
-    private fun List<Chapter>.toChapterListItems(manga: Manga): List<ChapterList.Item> {
+    private fun List<Chapter>.toChapterListItems(manga: Manga, source: Source): List<ChapterList.Item> {
         val isLocal = manga.isLocal()
+        val devices = deviceHoldings.index.value
         return map { chapter ->
             val activeDownload = if (isLocal) {
                 null
@@ -571,6 +619,9 @@ class MangaViewModel(
                 downloadState = downloadState,
                 downloadProgress = activeDownload?.progress ?: 0,
                 selected = chapter.id in selectedChapterIds,
+                isOnRemote = !isLocal && downloadManager.isChapterOnRemote(chapter, manga, source),
+                isKeptOnDevice = if (isLocal) null else downloadManager.isChapterKeptOnDevice(chapter, manga, source),
+                onDevices = if (isLocal) emptyList() else devices.deviceNames(manga.source, manga.url, chapter.url),
             )
         }
     }
@@ -682,7 +733,14 @@ class MangaViewModel(
     ) {
         when (action) {
             ChapterDownloadAction.START -> {
-                startDownload(items.map { it.chapter }, false)
+                val chapters = items.map { it.chapter }
+                // Recorded before the download starts, so the upload that
+                // follows it already knows this one was asked for by hand and
+                // must not be evicted the moment it lands.
+                withMangaAndSource { manga, source ->
+                    downloadManager.onManualDownload(chapters, manga, source)
+                }
+                startDownload(chapters, false)
                 if (items.any { it.downloadState == Download.State.ERROR }) {
                     downloadManager.startDownloads()
                 }
@@ -698,20 +756,93 @@ class MangaViewModel(
             ChapterDownloadAction.DELETE -> {
                 deleteChapters(items.map { it.chapter })
             }
+            ChapterDownloadAction.DELETE_REMOTE -> {
+                deleteRemoteChapters(items.map { it.chapter })
+            }
+            ChapterDownloadAction.KEEP_ON_DEVICE -> {
+                val chapters = items.map { it.chapter }
+                withMangaAndSource { manga, source ->
+                    downloadManager.keepChaptersOnDevice(chapters, manga, source)
+                }
+            }
+            ChapterDownloadAction.ALLOW_REMOVAL -> {
+                val chapters = items.map { it.chapter }
+                withMangaAndSource { manga, source ->
+                    downloadManager.allowChapterRemoval(chapters, manga, source)
+                }
+            }
         }
     }
 
+    /**
+     * Runs [block] with the loaded manga and its source, or does nothing when
+     * the screen has not finished loading. Every remote action needs both, and
+     * neither is available before then.
+     */
+    private inline fun withMangaAndSource(block: (Manga, Source) -> Unit) {
+        val state = successState ?: return
+        block(state.manga, state.source)
+        // The pin lives outside the chapter rows, so nothing else would tell
+        // the list to recompose.
+        updateSuccessState { current ->
+            current.copy(
+                chapters = current.chapters.map { item ->
+                    item.copy(
+                        isKeptOnDevice = downloadManager.isChapterKeptOnDevice(
+                            item.chapter,
+                            current.manga,
+                            current.source,
+                        ),
+                    )
+                },
+            )
+        }
+    }
+
+    /**
+     * Removes the server copies only, leaving anything on this device alone.
+     * The ordinary delete may also do this, but only when the remote is
+     * configured as a mirror rather than an archive.
+     */
+    private fun deleteRemoteChapters(chapters: List<Chapter>) {
+        val manga = successState?.manga ?: return
+        val source = successState?.source ?: return
+        downloadManager.deleteRemoteChapters(chapters, manga, source)
+    }
+
     fun runDownloadAction(action: DownloadAction) {
+        // Its own branch because it has to ask the server, and everything else
+        // here is answered from state already in hand.
+        if (action == DownloadAction.UNREAD_NOT_ON_SERVER) {
+            downloadUnreadNotOnServer()
+            return
+        }
+
         val chaptersToDownload = when (action) {
             DownloadAction.NEXT_1_CHAPTER -> getUnreadChaptersSorted().take(1)
             DownloadAction.NEXT_5_CHAPTERS -> getUnreadChaptersSorted().take(5)
             DownloadAction.NEXT_10_CHAPTERS -> getUnreadChaptersSorted().take(10)
             DownloadAction.NEXT_25_CHAPTERS -> getUnreadChaptersSorted().take(25)
             DownloadAction.UNREAD_CHAPTERS -> getUnreadChapters()
+            DownloadAction.UNREAD_NOT_ON_SERVER -> emptyList()
             DownloadAction.BOOKMARKED_CHAPTERS -> getBookmarkedChapters()
         }
         if (chaptersToDownload.isNotEmpty()) {
             startDownload(chaptersToDownload, false)
+        }
+    }
+
+    private fun downloadUnreadNotOnServer() {
+        val manga = successState?.manga ?: return
+        val source = successState?.source ?: return
+        val unread = getUnreadChapters()
+        if (unread.isEmpty()) return
+
+        viewModelScope.launchNonCancellable {
+            val chapters = downloadManager.filterNotOnRemote(unread, manga, source)
+            if (chapters.isNotEmpty()) {
+                startDownload(chapters, false)
+            }
         }
     }
 
@@ -1206,6 +1337,15 @@ sealed class ChapterList {
         val downloadState: Download.State,
         val downloadProgress: Int,
         val selected: Boolean = false,
+        /** Whether the configured remote server holds this chapter. */
+        val isOnRemote: Boolean = false,
+        /**
+         * Whether the user pinned this chapter against automatic eviction, or
+         * null when no policy would evict it and the question does not arise.
+         */
+        val isKeptOnDevice: Boolean? = null,
+        /** Names of the linked devices holding this chapter. */
+        val onDevices: List<String> = emptyList(),
     ) : ChapterList() {
         val id = chapter.id
         val isDownloaded = downloadState == Download.State.DOWNLOADED

@@ -84,6 +84,16 @@ class DownloadProvider(
     }
 
     /**
+     * Returns the download directory of every source, by directory name, from a single listing.
+     */
+    fun listSourceDirs(): Map<String, UniFile> {
+        return downloadsDir?.listFiles()
+            ?.mapNotNull { dir -> dir.name?.let { it to dir } }
+            ?.toMap()
+            .orEmpty()
+    }
+
+    /**
      * Returns the download directory for a manga if it exists.
      *
      * @param mangaTitle the title of the manga to query.

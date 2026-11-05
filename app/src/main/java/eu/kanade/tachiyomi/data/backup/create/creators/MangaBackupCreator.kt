@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.data.backup.create.creators
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.async.coroutines.awaitAsOne
+import com.hippo.unifile.UniFile
 import dev.zacsweers.metro.Inject
 import eu.kanade.tachiyomi.data.backup.create.BackupOptions
 import eu.kanade.tachiyomi.data.backup.models.BackupChapter
@@ -9,27 +10,40 @@ import eu.kanade.tachiyomi.data.backup.models.BackupHistory
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.models.backupChapterMapper
 import eu.kanade.tachiyomi.data.backup.models.backupTrackMapper
+import eu.kanade.tachiyomi.data.download.DownloadProvider
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
+import logcat.LogPriority
+import mihon.data.remote.RemoteMirror
+import tachiyomi.core.common.util.system.logcat
 import tachiyomi.data.Database
 import tachiyomi.data.MemoColumnAdapter
 import tachiyomi.domain.category.interactor.GetCategories
 import tachiyomi.domain.history.interactor.GetHistory
 import tachiyomi.domain.manga.model.Manga
+import tachiyomi.domain.source.service.SourceManager
 
 @Inject
 class MangaBackupCreator(
     private val database: Database,
     private val getCategories: GetCategories,
     private val getHistory: GetHistory,
+    private val downloadProvider: DownloadProvider,
+    private val remoteMirror: RemoteMirror,
+    private val sourceManager: SourceManager,
 ) {
 
     suspend operator fun invoke(mangas: List<Manga>, options: BackupOptions): List<BackupManga> {
+        val downloadState = DownloadState()
         return mangas.map {
-            backupManga(it, options)
+            backupManga(it, options, downloadState)
+        }.also {
+            logcat(LogPriority.INFO) {
+                "Read download state for ${mangas.size} entries in ${downloadState.elapsedMs} ms"
+            }
         }
     }
 
-    private suspend fun backupManga(manga: Manga, options: BackupOptions): BackupManga {
+    private suspend fun backupManga(manga: Manga, options: BackupOptions, downloadState: DownloadState): BackupManga {
         // Entry for this manga
         val mangaObject = manga.toBackupManga()
 
@@ -47,6 +61,7 @@ class MangaBackupCreator(
                 )
                 .awaitAsList()
                 .takeUnless(List<BackupChapter>::isEmpty)
+                ?.also { downloadState.mark(manga, it) }
                 ?.let { mangaObject.chapters = it }
         }
 
@@ -83,6 +98,58 @@ class MangaBackupCreator(
         }
 
         return mangaObject
+    }
+
+    /**
+     * Where each chapter is kept, worked out once per series rather than once per chapter. Most of
+     * a large library has nothing downloaded and nothing on the server, and asking about each of
+     * those chapters anyway is what made a backup take minutes.
+     *
+     * Reads the downloads folder rather than the download cache: the cache fills in the background
+     * and a backup job can easily run before it has, which would record nothing as downloaded.
+     * Each folder is listed at most once per backup.
+     *
+     * The server copy comes from the saved server index only. A backup never asks the server: an
+     * automatic backup asking once per series would be hundreds of requests, so a series the index
+     * hasn't listed yet is recorded as not on the server.
+     */
+    private inner class DownloadState {
+        private val sourceDirs by lazy { downloadProvider.listSourceDirs() }
+        private val mangaDirs = HashMap<String, Map<String, UniFile>>()
+
+        var elapsedMs = 0L
+            private set
+
+        suspend fun mark(manga: Manga, chapters: List<BackupChapter>) {
+            val start = System.currentTimeMillis()
+            val source = sourceManager.getOrStub(manga.source)
+            val sourceDirName = downloadProvider.getSourceDirName(source)
+            val mangaDirName = downloadProvider.getMangaDirName(manga.title)
+
+            val onDisk = mangaDirsOf(sourceDirName)[mangaDirName]
+                ?.listFiles()
+                ?.mapNotNullTo(HashSet()) { it.name }
+                .orEmpty()
+            val onServer = remoteMirror.knownFor(sourceDirName, mangaDirName).orEmpty()
+
+            if (onDisk.isNotEmpty() || onServer.isNotEmpty()) {
+                chapters.forEach { chapter ->
+                    val names = downloadProvider.getValidChapterDirNames(chapter.name, chapter.scanlator, chapter.url)
+                    chapter.downloaded = names.any { it in onDisk }
+                    // Only archives are uploaded, so only an archive name can be on the server
+                    chapter.onServer = names.any { it.endsWith(".cbz") && it in onServer }
+                }
+            }
+            elapsedMs += System.currentTimeMillis() - start
+        }
+
+        private fun mangaDirsOf(sourceDirName: String): Map<String, UniFile> =
+            mangaDirs.getOrPut(sourceDirName) {
+                sourceDirs[sourceDirName]?.listFiles()
+                    ?.mapNotNull { dir -> dir.name?.let { it to dir } }
+                    ?.toMap()
+                    .orEmpty()
+            }
     }
 }
 

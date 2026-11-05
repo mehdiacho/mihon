@@ -7,6 +7,8 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.databinding.DownloadItemBinding
 import eu.kanade.tachiyomi.util.view.popupMenu
+import tachiyomi.core.common.i18n.stringResource
+import tachiyomi.i18n.MR
 
 /**
  * Class used to hold the data of a download.
@@ -32,13 +34,22 @@ class DownloadHolder(private val view: View, val adapter: DownloadAdapter) :
      *
      * @param category The category to bind.
      */
-    fun bind(download: Download) {
+    fun bind(download: Download, claimedBy: String? = null) {
         this.download = download
         // Update the chapter name.
         binding.chapterTitle.text = download.chapter.name
 
         // Update the manga title
         binding.mangaFullTitle.text = download.manga.title
+
+        // Paused here while a linked PC downloads it
+        if (claimedBy != null) {
+            binding.downloadProgress.progress = 0
+            binding.downloadProgress.max = 1
+            binding.downloadProgressText.text =
+                view.context.stringResource(MR.strings.download_on_device, claimedBy)
+            return
+        }
 
         // Update the progress bar and the number of downloaded pages
         val pages = download.pages
