@@ -1233,6 +1233,8 @@
     <string name="pref_lan_sync_unlink_text">It will need the pairing code to link again.</string>
     <string name="pref_lan_sync_unlink">Unlink</string>
     <string name="download_on_device">Downloading on %1$s</string>
+    <!-- A chapter held by a linked computer. %1$s is one device name, or several joined by commas. -->
+    <string name="chapter_on_devices">On %1$s</string>
     <string name="pref_lan_sync_links_info">A linked device talks to this one without the code, using a key made when they linked. The network traffic is plain HTTP, so anyone on this Wi-Fi who can watch it could copy the key.</string>
     <!-- NAS connection in backups -->
     <string name="backup_nas_connection">NAS connection</string>

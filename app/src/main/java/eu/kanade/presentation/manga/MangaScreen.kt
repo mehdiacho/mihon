@@ -786,6 +786,7 @@ private fun LazyListScope.sharedChapterItems(
                     downloadProgressProvider = { item.downloadProgress },
                     isOnRemote = item.isOnRemote,
                     isKeptOnDevice = item.isKeptOnDevice,
+                    onDevices = item.onDevices,
                     chapterSwipeStartAction = chapterSwipeStartAction,
                     chapterSwipeEndAction = chapterSwipeEndAction,
                     onLongClick = {

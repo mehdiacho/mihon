@@ -37,6 +37,7 @@ import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.ArrowDownward
 import mihon.icons.materialsymbols.rounded.Cloud
 import mihon.icons.materialsymbols.rounded.Error
+import mihon.icons.materialsymbols.rounded.Laptop
 import mihon.icons.materialsymbols.roundedfilled.CheckCircle
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.IconButtonTokens
@@ -68,6 +69,8 @@ enum class ChapterDownloadAction {
  * @param isKeptOnDevice true or false when the eviction policy could remove
  * this chapter and the user has or has not pinned it; null when nothing would
  * evict it anyway, in which case pinning is not offered.
+ * @param onDevices names of the linked devices holding this chapter. Its own
+ * badge, apart from the cloud: the NAS is always on, a PC often isn't.
  */
 @Composable
 fun ChapterDownloadIndicator(
@@ -78,11 +81,15 @@ fun ChapterDownloadIndicator(
     modifier: Modifier = Modifier,
     isOnRemote: Boolean = false,
     isKeptOnDevice: Boolean? = null,
+    onDevices: List<String> = emptyList(),
 ) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (onDevices.isNotEmpty()) {
+            DeviceCopyBadge(enabled = enabled, deviceNames = onDevices)
+        }
         if (isOnRemote) {
             RemoteCopyBadge(
                 enabled = enabled,
@@ -174,6 +181,45 @@ private fun RemoteCopyBadge(
                     onClick(ChapterDownloadAction.DELETE_REMOTE)
                     isMenuExpanded = false
                 },
+            )
+        }
+    }
+}
+
+/**
+ * A linked device holds this chapter. Tapping or long-pressing says which; reading it works only
+ * while that device is on, and the reader falls back to the source when it isn't.
+ */
+@Composable
+private fun DeviceCopyBadge(
+    enabled: Boolean,
+    deviceNames: List<String>,
+) {
+    var isMenuExpanded by remember { mutableStateOf(false) }
+    val label = stringResource(MR.strings.chapter_on_devices, deviceNames.joinToString(", "))
+    Box(
+        modifier = Modifier
+            .width(RemoteBadgeWidth)
+            .height(IconButtonTokens.StateLayerSize)
+            .commonClickable(
+                enabled = enabled,
+                hapticFeedback = LocalHapticFeedback.current,
+                onLongClick = { isMenuExpanded = true },
+                onClick = { isMenuExpanded = true },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = MaterialSymbols.Rounded.Laptop,
+            contentDescription = label,
+            modifier = Modifier.size(RemoteBadgeIconSize),
+            // Where the chapter is, like the cloud, so the same accent
+            tint = MaterialTheme.colorScheme.tertiary,
+        )
+        DropdownMenu(expanded = isMenuExpanded, onDismissRequest = { isMenuExpanded = false }) {
+            DropdownMenuItem(
+                text = { Text(text = label) },
+                onClick = { isMenuExpanded = false },
             )
         }
     }

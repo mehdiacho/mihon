@@ -8,6 +8,7 @@ import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.Cloud
 import mihon.icons.materialsymbols.rounded.Folder
+import mihon.icons.materialsymbols.rounded.Laptop
 import tachiyomi.presentation.core.components.Badge
 
 @Composable
@@ -45,6 +46,23 @@ internal fun RemoteBadge(count: Int) {
         Badge(
             text = "$count",
             imageVector = MaterialSymbols.Rounded.Cloud,
+            color = MaterialTheme.colorScheme.inverseSurface,
+            textColor = MaterialTheme.colorScheme.inverseOnSurface,
+            iconColor = MaterialTheme.colorScheme.inverseOnSurface,
+        )
+    }
+}
+
+/**
+ * Chapters a linked computer holds for this profile. The same neutral pair as [RemoteBadge], told
+ * apart from it by the laptop icon: these can only be read while that computer is on.
+ */
+@Composable
+internal fun DeviceBadge(count: Int) {
+    if (count > 0) {
+        Badge(
+            text = "$count",
+            imageVector = MaterialSymbols.Rounded.Laptop,
             color = MaterialTheme.colorScheme.inverseSurface,
             textColor = MaterialTheme.colorScheme.inverseOnSurface,
             iconColor = MaterialTheme.colorScheme.inverseOnSurface,

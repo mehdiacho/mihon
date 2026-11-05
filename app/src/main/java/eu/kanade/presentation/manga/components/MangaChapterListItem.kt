@@ -66,6 +66,7 @@ fun MangaChapterListItem(
     modifier: Modifier = Modifier,
     isOnRemote: Boolean = false,
     isKeptOnDevice: Boolean? = null,
+    onDevices: List<String> = emptyList(),
 ) {
     val start = getSwipeAction(
         action = chapterSwipeStartAction,
@@ -181,6 +182,7 @@ fun MangaChapterListItem(
                 onClick = { onDownloadClick?.invoke(it) },
                 isOnRemote = isOnRemote,
                 isKeptOnDevice = isKeptOnDevice,
+                onDevices = onDevices,
             )
         }
     }

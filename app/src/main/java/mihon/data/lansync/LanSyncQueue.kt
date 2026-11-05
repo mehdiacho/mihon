@@ -47,6 +47,7 @@ class LanSyncQueue(
     private val remoteClients: RemoteClientProvider,
     private val sourceManager: SourceManager,
     private val getManga: GetMangaByUrlAndSourceId,
+    private val holdings: DeviceHoldingsStore,
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -170,6 +171,8 @@ class LanSyncQueue(
                     .filter { it.platform == LanSyncLink.PLATFORM_DESKTOP && it.lastAddress != null }
                     .forEach { pullOutbox(it) }
                 readNasOutbox()
+                // What each computer holds for this profile, for the "on <device>" badges
+                holdings.refresh()
             }
         }
     }

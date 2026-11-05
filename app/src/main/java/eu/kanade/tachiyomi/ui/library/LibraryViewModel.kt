@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import mihon.core.common.utils.mutate
+import mihon.data.lansync.DeviceHoldingsStore
 import mihon.data.remote.RemoteIndex
 import mihon.domain.library.model.search.QueryNode
 import mihon.feature.library.matches
@@ -93,6 +94,7 @@ class LibraryViewModel(
     private val coverCache: CoverCache,
     private val sourceManager: SourceManager,
     private val remoteIndex: RemoteIndex,
+    private val deviceHoldings: DeviceHoldingsStore,
     private val downloadManager: DownloadManager,
     private val downloadCache: DownloadCache,
     private val trackerManager: TrackerManager,
@@ -422,12 +424,15 @@ class LibraryViewModel(
             // waits for every source: without it the library would not render
             // at all until something touched the server.
             remoteIndex.changes.onStart { emit(Unit) },
-        ) { libraryManga, preferences, _, _ ->
+            deviceHoldings.index,
+        ) { libraryManga, preferences, _, _, devices ->
             libraryManga.map { manga ->
+                val deviceCount = devices.count(manga.manga.source, manga.manga.url)
                 LibraryItem(
                     libraryManga = manga,
                     downloadCount = downloadManager.getDownloadCount(manga.manga),
                     remoteCount = downloadManager.getRemoteCount(manga.manga),
+                    deviceCount = deviceCount,
                     unreadCount = manga.unreadCount,
                     isLocal = manga.manga.isLocal(),
                     sourceName = sourceManager.getOrStub(manga.manga.source).name.lowercase(),
@@ -443,6 +448,8 @@ class LibraryViewModel(
                         } else {
                             0
                         },
+                        // Under the downloads toggle: these are downloads, just on another device
+                        deviceCount = if (preferences.downloadBadge) deviceCount else 0,
                         unreadCount = if (preferences.unreadBadge) {
                             manga.unreadCount
                         } else {

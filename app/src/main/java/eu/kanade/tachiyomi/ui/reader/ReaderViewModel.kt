@@ -69,6 +69,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import logcat.LogPriority
+import mihon.data.lansync.DeviceHoldingsStore
 import mihon.data.remote.RemoteMirror
 import mihon.data.remote.remoteChapterFileNames
 import tachiyomi.core.common.preference.toggle
@@ -124,6 +125,7 @@ class ReaderViewModel(
     private val chapterCache: ChapterCache,
     private val downloadCache: DownloadCache,
     private val remoteMirror: RemoteMirror,
+    private val deviceHoldings: DeviceHoldingsStore,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -337,6 +339,7 @@ class ReaderViewModel(
                     manga,
                     source,
                     remoteMirror,
+                    deviceHoldings,
                 )
 
                 loadChapter(loader!!, chapterList.first { chapterId == it.chapter.id })

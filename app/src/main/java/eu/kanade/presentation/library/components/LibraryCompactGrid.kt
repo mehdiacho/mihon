@@ -47,6 +47,7 @@ internal fun LibraryCompactGrid(
                 coverBadgeStart = {
                     DownloadsBadge(count = libraryItem.badges.downloadCount)
                     RemoteBadge(count = libraryItem.badges.remoteCount)
+                    DeviceBadge(count = libraryItem.badges.deviceCount)
                     UnreadBadge(count = libraryItem.badges.unreadCount)
                 },
                 coverBadgeEnd = {

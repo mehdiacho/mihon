@@ -57,6 +57,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import logcat.LogPriority
+import mihon.data.lansync.DeviceHoldingsStore
 import mihon.data.remote.RemoteIndex
 import mihon.domain.chapter.interactor.FilterChaptersForDownload
 import mihon.domain.source.interactor.UpdateMangaFromRemote
@@ -104,6 +105,7 @@ class MangaViewModel(
     private val trackChapter: TrackChapter,
     private val downloadManager: DownloadManager,
     private val remoteIndex: RemoteIndex,
+    private val deviceHoldings: DeviceHoldingsStore,
     private val downloadCache: DownloadCache,
     private val getMangaAndChapters: GetMangaWithChapters,
     private val getDuplicateLibraryManga: GetDuplicateLibraryManga,
@@ -202,6 +204,21 @@ class MangaViewModel(
                                     state.manga,
                                     state.source,
                                 ),
+                            )
+                        },
+                    )
+                }
+            }
+        }
+
+        // What linked computers hold changes when one is reached or reports a download
+        viewModelScope.launchIO {
+            deviceHoldings.index.collectLatest { index ->
+                updateSuccessState { state ->
+                    state.copy(
+                        chapters = state.chapters.map { item ->
+                            item.copy(
+                                onDevices = index.deviceNames(state.manga.source, state.manga.url, item.chapter.url),
                             )
                         },
                     )
@@ -573,6 +590,7 @@ class MangaViewModel(
 
     private fun List<Chapter>.toChapterListItems(manga: Manga, source: Source): List<ChapterList.Item> {
         val isLocal = manga.isLocal()
+        val devices = deviceHoldings.index.value
         return map { chapter ->
             val activeDownload = if (isLocal) {
                 null
@@ -603,6 +621,7 @@ class MangaViewModel(
                 selected = chapter.id in selectedChapterIds,
                 isOnRemote = !isLocal && downloadManager.isChapterOnRemote(chapter, manga, source),
                 isKeptOnDevice = if (isLocal) null else downloadManager.isChapterKeptOnDevice(chapter, manga, source),
+                onDevices = if (isLocal) emptyList() else devices.deviceNames(manga.source, manga.url, chapter.url),
             )
         }
     }
@@ -1325,6 +1344,8 @@ sealed class ChapterList {
          * null when no policy would evict it and the question does not arise.
          */
         val isKeptOnDevice: Boolean? = null,
+        /** Names of the linked devices holding this chapter. */
+        val onDevices: List<String> = emptyList(),
     ) : ChapterList() {
         val id = chapter.id
         val isDownloaded = downloadState == Download.State.DOWNLOADED
