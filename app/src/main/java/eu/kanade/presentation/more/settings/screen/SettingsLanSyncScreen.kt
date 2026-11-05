@@ -1,5 +1,6 @@
 package eu.kanade.presentation.more.settings.screen
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
@@ -98,18 +99,21 @@ object SettingsLanSyncScreen : SearchableSettings {
                         title = stringResource(MR.strings.pref_lan_sync_linked_devices),
                     ) {
                         var unlinking by remember { mutableStateOf<LanSyncLink.Link?>(null) }
-                        if (linked.isEmpty()) {
-                            TextPreferenceWidget(
-                                title = stringResource(MR.strings.pref_lan_sync_linked_devices),
-                                subtitle = stringResource(MR.strings.pref_lan_sync_no_links),
-                            )
-                        }
-                        linked.forEach { link ->
-                            TextPreferenceWidget(
-                                title = link.peerName,
-                                subtitle = listOfNotNull(link.platform, link.lastAddress).joinToString(" · "),
-                                onPreferenceClick = { unlinking = link },
-                            )
+                        // The settings wrapper stacks its children, so the rows need their own column
+                        Column {
+                            if (linked.isEmpty()) {
+                                TextPreferenceWidget(
+                                    title = stringResource(MR.strings.pref_lan_sync_linked_devices),
+                                    subtitle = stringResource(MR.strings.pref_lan_sync_no_links),
+                                )
+                            }
+                            linked.forEach { link ->
+                                TextPreferenceWidget(
+                                    title = link.peerName,
+                                    subtitle = listOfNotNull(link.platform, link.lastAddress).joinToString(" · "),
+                                    onPreferenceClick = { unlinking = link },
+                                )
+                            }
                         }
                         unlinking?.let { link ->
                             UnlinkDialog(
