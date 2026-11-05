@@ -2,6 +2,7 @@ package eu.kanade.presentation.more.settings.screen
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +37,19 @@ object SettingsLanSyncScreen : SearchableSettings {
         val links = remember { context.appGraph.lanSyncLinks }
         val linked by remember { links.changes() }.collectAsStateWithLifecycle(links.all())
         val profileName by prefs.profileName.collectAsState()
+
+        // The link dialog lives up here so an invite that opened the app (tachimana://link from the camera) can
+        // open it, whether or not its row is on screen yet
+        val linker = remember { context.appGraph.lanSyncLinker }
+        val pendingInvite by linker.pendingInvite.collectAsStateWithLifecycle()
+        var linking by remember { mutableStateOf(false) }
+        var invite by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(pendingInvite) {
+            val incoming = pendingInvite ?: return@LaunchedEffect
+            linker.pendingInvite.value = null
+            invite = incoming
+            linking = true
+        }
 
         val address = when (val current = state) {
             is LanSyncServer.State.Running -> if (current.addresses.isEmpty()) {
@@ -87,13 +101,20 @@ object SettingsLanSyncScreen : SearchableSettings {
                     Preference.PreferenceItem.CustomPreference(
                         title = stringResource(MR.strings.pref_lan_sync_link_computer),
                     ) {
-                        var linking by remember { mutableStateOf(false) }
                         TextPreferenceWidget(
                             title = stringResource(MR.strings.pref_lan_sync_link_computer),
                             subtitle = stringResource(MR.strings.pref_lan_sync_link_computer_summary),
                             onPreferenceClick = { linking = true },
                         )
-                        if (linking) LinkComputerDialog(onDismissRequest = { linking = false })
+                        if (linking) {
+                            LinkComputerDialog(
+                                initialInvite = invite,
+                                onDismissRequest = {
+                                    linking = false
+                                    invite = null
+                                },
+                            )
+                        }
                     },
                     Preference.PreferenceItem.CustomPreference(
                         title = stringResource(MR.strings.pref_lan_sync_linked_devices),

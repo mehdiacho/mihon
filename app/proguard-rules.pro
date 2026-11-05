@@ -91,3 +91,7 @@
     public <init>();
     public void destroy();
 }
+
+# ML Kit (the LAN sync QR scanner) builds its component registrars by reflection from the manifest. R8 kept the
+# classes but dropped their no-arg constructors, so no components registered and opening the scanner crashed.
+-keep class * implements com.google.firebase.components.ComponentRegistrar { <init>(); }

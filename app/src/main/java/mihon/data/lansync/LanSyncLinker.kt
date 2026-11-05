@@ -9,6 +9,7 @@ import dev.zacsweers.metro.SingleIn
 import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreWorker
 import eu.kanade.tachiyomi.data.backup.restore.RestoreOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import logcat.LogPriority
@@ -42,6 +43,12 @@ class LanSyncLinker(
         data object LockedOut : Result
         data class Failed(val reason: String) : Result
     }
+
+    /**
+     * A `tachimana://link` invite that opened the app from outside (camera, Lens, a tapped link), waiting for the
+     * LAN sync screen to show it in the link dialog. Nothing links until the user confirms there.
+     */
+    val pendingInvite = MutableStateFlow<String?>(null)
 
     private val json = Json {
         ignoreUnknownKeys = true
