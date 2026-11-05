@@ -53,6 +53,13 @@ class LanSyncPreferences(
     val remoteQueue: Preference<String> =
         preferenceStore.getString(Preference.appStateKey("lan_sync_remote_queue"), "")
 
+    /**
+     * The port this install last served on, tried first next time. Two installs on one phone would
+     * otherwise take ports in whatever order they start, and a linked PC would then reach the other
+     * install with this one's key and read its 401 as an unlink.
+     */
+    val lastPort: Preference<Int> = preferenceStore.getInt(Preference.appStateKey("lan_sync_last_port"), 0)
+
     /** Joining another device's profile, from a link the user confirmed. */
     fun adoptProfile(id: String, name: String) {
         profileIdPref.set(id)

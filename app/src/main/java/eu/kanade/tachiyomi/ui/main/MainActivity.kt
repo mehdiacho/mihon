@@ -76,6 +76,7 @@ import eu.kanade.presentation.components.DownloadedOnlyBannerBackgroundColor
 import eu.kanade.presentation.components.IncognitoModeBannerBackgroundColor
 import eu.kanade.presentation.components.IndexingBannerBackgroundColor
 import eu.kanade.presentation.more.AppMigratingScreen
+import eu.kanade.presentation.more.settings.screen.LinkComputerDialog
 import eu.kanade.presentation.more.settings.screen.browse.ExtensionStoresScreen
 import eu.kanade.presentation.more.settings.screen.data.RestoreBackupScreen
 import eu.kanade.presentation.util.AssistContentScreen
@@ -290,6 +291,16 @@ class MainActivity : BaseActivity() {
                             )
                         }
                     }
+                }
+
+                // Fork: the link dialog for a tachimana://link invite the app was opened with
+                val lanSyncLinker = remember { appGraph.lanSyncLinker }
+                val pendingInvite by lanSyncLinker.pendingInvite.collectAsState()
+                pendingInvite?.let { invite ->
+                    LinkComputerDialog(
+                        initialInvite = invite,
+                        onDismissRequest = { lanSyncLinker.pendingInvite.value = null },
+                    )
                 }
 
                 // Pop source-related screens when incognito mode is turned off
@@ -667,11 +678,11 @@ class MainActivity : BaseActivity() {
                 null
             }
             Intent.ACTION_VIEW -> {
-                // Fork: a TachiMana link invite opens the link dialog, filled in, for the user to confirm
+                // Fork: a TachiMana link invite opens the link dialog, filled in, over whatever is on screen. It used
+                // to push the LAN sync settings; a second scan then put two of that screen in the transition at once,
+                // which Compose rejects as a duplicate key and crashes.
                 if (intent.scheme.equals(LanSyncLink.INVITE_SCHEME, ignoreCase = true)) {
                     intent.dataString?.let { appGraph.lanSyncLinker.pendingInvite.value = it }
-                    navigator.popUntilRoot()
-                    navigator.push(SettingsScreen(SettingsScreen.Destination.LanSync))
                 }
                 // Handling opening of backup files
                 else if (intent.data.toString().endsWith(".tachibk")) {
