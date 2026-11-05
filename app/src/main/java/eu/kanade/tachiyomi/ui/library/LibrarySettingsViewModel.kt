@@ -8,9 +8,9 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.tachiyomi.data.track.TrackerManager
-import mihon.data.remote.RemoteMirror
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import mihon.data.remote.RemoteMirror
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.TriState
 import tachiyomi.core.common.preference.getAndSet
@@ -40,7 +40,6 @@ class LibrarySettingsViewModel(
      * mirroring on is a trip to another screen, which closes this dialog.
      */
     val mirroringEnabled: Boolean = remoteMirror.isEnabled
-
 
     val trackersFlow = trackerManager.loggedInTrackersFlow()
         .stateIn(
