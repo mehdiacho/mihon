@@ -32,6 +32,29 @@ class LanSyncPreferences(
     val deviceId: String
         get() = deviceIdPref.get().ifEmpty { UUID.randomUUID().toString().also(deviceIdPref::set) }
 
+    /**
+     * This install's profile in the TachiMana sense: one install is one profile. Made on first use
+     * and kept, except when the user chooses to join a computer's profile while linking.
+     */
+    private val profileIdPref: Preference<String> =
+        preferenceStore.getString(Preference.appStateKey("lan_sync_profile_id"), "")
+
+    val profileId: String
+        get() = profileIdPref.get().ifEmpty { UUID.randomUUID().toString().also(profileIdPref::set) }
+
+    /** Blank means the app's label. */
+    val profileName: Preference<String> =
+        preferenceStore.getString(Preference.appStateKey("lan_sync_profile_name"), "")
+
+    /** JSON list of [LanSyncLink.Link]. App state like the rest: keys must never travel in a backup. */
+    val links: Preference<String> = preferenceStore.getString(Preference.appStateKey("lan_sync_links"), "")
+
+    /** Joining another device's profile, from a link the user confirmed. */
+    fun adoptProfile(id: String, name: String) {
+        profileIdPref.set(id)
+        profileName.set(name)
+    }
+
     /** The current code, making one the first time it's needed. */
     fun currentPairCode(): String = pairCode.get().ifEmpty { newPairCode() }
 

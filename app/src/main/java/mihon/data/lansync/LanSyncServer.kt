@@ -46,6 +46,7 @@ class LanSyncServer(
     private val context: Context,
     private val preferences: LanSyncPreferences,
     private val catalog: LanSyncCatalog,
+    private val links: LanSyncLinks,
 ) {
 
     sealed interface State {
@@ -57,7 +58,11 @@ class LanSyncServer(
     private val _state = MutableStateFlow<State>(State.Off)
     val state: StateFlow<State> = _state.asStateFlow()
 
-    private val json = Json { encodeDefaults = true }
+    // explicitNulls off so a 409's LinkResponse leaves `key` out rather than sending null
+    private val json = Json {
+        encodeDefaults = true
+        explicitNulls = false
+    }
     private val lockout = PairCodeLockout()
 
     private var socket: ServerSocket? = null
@@ -146,11 +151,30 @@ class LanSyncServer(
         val out = BufferedOutputStream(client.getOutputStream())
         try {
             val request = LanSyncProtocol.readRequest(client.getInputStream())
+            val linkKey = request?.header(LanSyncLink.LINK_KEY_HEADER)
             when {
                 request == null -> respondJson(out, 400, LanSyncProtocol.Error("bad request"))
+                request.path == "/link" -> link(request, client, out)
                 request.method != "GET" -> respondJson(out, 405, LanSyncProtocol.Error("GET only"))
-                request.path == "/ping" -> respondJson(out, 200, LanSyncProtocol.Ping(preferences.deviceId, deviceName))
+                request.path == "/ping" -> respondJson(
+                    out,
+                    200,
+                    LanSyncProtocol.Ping(preferences.deviceId, deviceName, links.profileId, links.profileName),
+                )
                 request.path !in AUTHED_ROUTES -> respondJson(out, 404, LanSyncProtocol.Error("not found"))
+                // A linked device skips the code, and the lockout: someone guessing codes mustn't
+                // cut off a device that already has a key
+                linkKey != null -> {
+                    val link = links.findByKey(linkKey)
+                    if (link == null) {
+                        respondJson(out, 401, LanSyncProtocol.Error("unknown link key"))
+                    } else {
+                        client.inetAddress?.hostAddress?.let { host ->
+                            links.touch(link, withPort(host, link.lastAddress))
+                        }
+                        serve(request, out)
+                    }
+                }
                 lockout.isLocked() -> respondJson(out, 429, LanSyncProtocol.Error("too many wrong codes, try later"))
                 !LanSyncProtocol.codeMatches(
                     preferences.currentPairCode(),
@@ -172,6 +196,63 @@ class LanSyncServer(
                 out.flush()
             }
         }
+    }
+
+    /**
+     * Pairing v2. Needs the code, counts toward the lockout like any other wrong code, and stores
+     * nothing unless the asking device is the same profile as this install.
+     */
+    private fun link(request: LanSyncProtocol.Request, client: Socket, out: OutputStream) {
+        if (request.method != "POST") {
+            respondJson(out, 405, LanSyncProtocol.Error("POST only"))
+            return
+        }
+        if (lockout.isLocked()) {
+            respondJson(out, 429, LanSyncProtocol.Error("too many wrong codes, try later"))
+            return
+        }
+        if (!LanSyncProtocol.codeMatches(
+                preferences.currentPairCode(),
+                request.header(LanSyncProtocol.PAIR_CODE_HEADER),
+            )
+        ) {
+            lockout.recordFailure()
+            respondJson(out, 401, LanSyncProtocol.Error("wrong pairing code"))
+            return
+        }
+        val body = LanSyncLink.readBody(client.getInputStream(), request.header("content-length"))
+            ?.let(LanSyncLink::parseRequest)
+        if (body == null) {
+            respondJson(out, 400, LanSyncProtocol.Error("bad link request"))
+            return
+        }
+
+        val me = LanSyncLink.LinkResponse(preferences.deviceId, deviceName, links.profileId, links.profileName)
+        if (body.profileId != me.profileId) {
+            respondJson(out, 409, me)
+            return
+        }
+
+        val key = LanSyncLink.newKey()
+        val host = client.inetAddress?.hostAddress
+        links.save(
+            LanSyncLink.Link(
+                peerDeviceId = body.deviceId,
+                peerName = body.deviceName,
+                profileId = body.profileId,
+                key = key,
+                lastAddress = host?.let { if (body.port != null) "$it:${body.port}" else it },
+                platform = body.platform,
+            ),
+        )
+        logcat(LogPriority.INFO) { "LAN sync linked ${body.deviceName} (${body.platform})" }
+        respondJson(out, 200, me.copy(key = key))
+    }
+
+    /** Keeps the port the device said it serves on, since the one it connects from is ephemeral. */
+    private fun withPort(host: String, previous: String?): String {
+        val port = previous?.substringAfterLast(':', "")?.takeIf { it.isNotEmpty() && ':' in previous }
+        return if (port != null) "$host:$port" else host
     }
 
     private fun serve(request: LanSyncProtocol.Request, out: OutputStream) {
@@ -212,6 +293,8 @@ class LanSyncServer(
             serviceName = deviceName
             serviceType = LanSyncProtocol.SERVICE_TYPE
             setPort(port)
+            // So a device lists the peers of its own profile first
+            setAttribute("p", links.profileId)
         }
         val listener = object : NsdManager.RegistrationListener {
             override fun onServiceRegistered(info: NsdServiceInfo) {

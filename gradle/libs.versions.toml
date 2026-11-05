@@ -192,6 +192,7 @@ swipe = { module = "me.saket.swipe:swipe", version.ref = "swipe" }
 tapmoc-gradle = { module = "com.gradleup.tapmoc:tapmoc-gradle-plugin", version.ref = "tapmoc" }
 unifile = { module = "com.github.mihon:unifile", version.ref = "unifile" }
 # Argon2id for the passphrase that protects a NAS password in a backup
+play-services-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version = "16.1.0" }
 bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 voyager-navigator = { module = "cafe.adriel.voyager:voyager-navigator", version.ref = "voyager" }
 voyager-tabNavigator = { module = "cafe.adriel.voyager:voyager-tab-navigator", version.ref = "voyager" }

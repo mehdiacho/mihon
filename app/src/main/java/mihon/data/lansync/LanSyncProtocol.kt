@@ -138,6 +138,7 @@ object LanSyncProtocol {
             401 -> "Unauthorized"
             404 -> "Not Found"
             405 -> "Method Not Allowed"
+            409 -> "Conflict"
             429 -> "Too Many Requests"
             503 -> "Service Unavailable"
             else -> "Internal Server Error"
@@ -153,8 +154,14 @@ object LanSyncProtocol {
         out.write(head.toByteArray(Charsets.ISO_8859_1))
     }
 
+    /** `profileId` and `profileName` are pairing v2's additions; older readers ignore them. */
     @Serializable
-    data class Ping(val deviceId: String, val deviceName: String)
+    data class Ping(
+        val deviceId: String,
+        val deviceName: String,
+        val profileId: String? = null,
+        val profileName: String? = null,
+    )
 
     @Serializable
     data class Manifest(

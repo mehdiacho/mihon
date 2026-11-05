@@ -329,6 +329,8 @@ dependencies {
     implementation(libs.diskLruCache)
     implementation(libs.unifile)
     implementation(libs.bouncycastle.bcprov)
+    // Fork: scans a TachiMana link QR code; Play Services owns the camera, so no permission here
+    implementation(libs.play.services.code.scanner)
 
     // Preferences
     implementation(libs.androidx.preference)

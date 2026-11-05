@@ -44,6 +44,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
 import mihon.core.metro.IsDebugBuild
 import mihon.data.backup.RestoreFollowUp
+import mihon.data.lansync.LanSyncLinker
+import mihon.data.lansync.LanSyncLinks
 import mihon.data.lansync.LanSyncPreferences
 import mihon.data.lansync.LanSyncServer
 import mihon.data.remote.MirrorExistingDownloads
@@ -118,6 +120,8 @@ interface AppGraph : ViewModelGraph {
     val restoreFollowUp: RestoreFollowUp
     val lanSyncPreferences: LanSyncPreferences
     val lanSyncServer: LanSyncServer
+    val lanSyncLinks: LanSyncLinks
+    val lanSyncLinker: LanSyncLinker
 
     val crashLogUtil: CrashLogUtil
 
