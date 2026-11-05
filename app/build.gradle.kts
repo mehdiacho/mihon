@@ -72,6 +72,12 @@ android {
         }
     }
 
+    // AGP only makes unit tests for this build type. CI runs testDebugUnitTest, so the
+    // default stays debug; -PdevTests moves them to customDev for the local loop.
+    if (project.hasProperty("devTests")) {
+        testBuildType = "customDev"
+    }
+
     buildTypes {
         val debug = getByName("debug") {
             applicationIdSuffix = ".dev"
@@ -131,6 +137,25 @@ android {
             // anyone could pass by accident, and this build must never offer to
             // "update" itself to an upstream APK it is not signed with.
             buildConfigField("boolean", "UPDATER_ENABLED", "false")
+        }
+        // custom without R8, for the edit-install loop on the phone. It has its own
+        // applicationId: installed over custom, the unminified host made custom crash in
+        // ART while loading its private extensions (SIGSEGV in LZ4_decompress_safe, on
+        // every launch), so the two must never share an install. BUILD_TIME is the commit time, so BuildConfig doesn't change between edits and
+        // force a wider recompile. With -PdevTests the unit tests run on it as well
+        // (testCustomDevUnitTest), sharing the compile with the APK instead of compiling
+        // the debug variant too. Build custom itself before committing, since R8 is what
+        // breaks serialization.
+        create("customDev") {
+            initWith(getByName("custom"))
+
+            isMinifyEnabled = false
+            isShrinkResources = false
+
+            applicationIdSuffix = ".customdev"
+            versionNameSuffix = "-customdev-${getLatestCommitCount()}"
+
+            buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLatestCommitTime = true)}\"")
         }
         // Same app as custom, with its own applicationId so it can hold a
         // different library. custom carries a small library kept for exercising

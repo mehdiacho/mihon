@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- customDev is a separate install from custom (see app/build.gradle.kts), so it
+         gets its own launcher label. -->
+    <string name="app_name" translatable="false">Mihon Dev</string>
+</resources>
