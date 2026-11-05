@@ -21,6 +21,9 @@ data class Download(
 ) {
     var pages: List<Page>? = null
 
+    /** When it joined the queue. Kept across restarts by DownloadStore; a linked PC sees it. */
+    var queuedAt: Long = System.currentTimeMillis()
+
     val totalProgress: Int
         get() = pages?.sumOf(Page::progress) ?: 0
 

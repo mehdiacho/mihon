@@ -293,6 +293,18 @@ class MainActivity : BaseActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // A linked PC may have finished chapters from this phone's queue while it was away
+        appGraph.lanSyncQueue.catchUpSoon()
+        appGraph.lanSyncQueue.watch(true)
+    }
+
+    override fun onStop() {
+        appGraph.lanSyncQueue.watch(false)
+        super.onStop()
+    }
+
     override fun onProvideAssistContent(outContent: AssistContent) {
         super.onProvideAssistContent(outContent)
         when (val screen = navigator?.lastItem) {

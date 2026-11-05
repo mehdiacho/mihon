@@ -47,6 +47,7 @@ class LanSyncServer(
     private val preferences: LanSyncPreferences,
     private val catalog: LanSyncCatalog,
     private val links: LanSyncLinks,
+    private val queue: LanSyncQueue,
 ) {
 
     sealed interface State {
@@ -155,6 +156,7 @@ class LanSyncServer(
             when {
                 request == null -> respondJson(out, 400, LanSyncProtocol.Error("bad request"))
                 request.path == "/link" -> link(request, client, out)
+                request.path in KEYED_ROUTES -> keyed(request, client, out)
                 request.method != "GET" -> respondJson(out, 405, LanSyncProtocol.Error("GET only"))
                 request.path == "/ping" -> respondJson(
                     out,
@@ -249,6 +251,67 @@ class LanSyncServer(
         respondJson(out, 200, me.copy(key = key))
     }
 
+    /**
+     * The routes only a linked device may use: the phone's queue, downloaded on a PC. The pairing
+     * code doesn't open these, so there's nothing here for someone guessing codes.
+     */
+    private fun keyed(request: LanSyncProtocol.Request, client: Socket, out: OutputStream) {
+        val link = links.findByKey(request.header(LanSyncLink.LINK_KEY_HEADER))
+        if (link == null) {
+            respondJson(out, 401, LanSyncProtocol.Error("needs a link key"))
+            return
+        }
+        client.inetAddress?.hostAddress?.let { links.touch(link, withPort(it, link.lastAddress)) }
+
+        val expected = if (request.path == "/queue") "GET" else "POST"
+        if (request.method != expected) {
+            respondJson(out, 405, LanSyncProtocol.Error("$expected only"))
+            return
+        }
+        if (request.path == "/queue") {
+            respondJson(out, 200, queue.items())
+            return
+        }
+
+        val body = LanSyncLink.readBody(
+            client.getInputStream(),
+            request.header("content-length"),
+            RemoteQueue.MAX_BODY_BYTES,
+        )
+        if (body == null) {
+            respondJson(out, 400, LanSyncProtocol.Error("bad body"))
+            return
+        }
+        when (request.path) {
+            "/queue/claim" -> {
+                val claim = RemoteQueue.parse<RemoteQueue.ClaimRequest>(body)
+                when {
+                    claim == null -> respondJson(out, 400, LanSyncProtocol.Error("bad claim"))
+                    claim.by != link.peerDeviceId ->
+                        respondJson(out, 400, LanSyncProtocol.Error("by must be the linked device's id"))
+                    else -> respondJson(out, 200, queue.claim(claim, link))
+                }
+            }
+            "/queue/release" -> {
+                val release = RemoteQueue.parse<RemoteQueue.ReleaseRequest>(body)
+                if (release == null) {
+                    respondJson(out, 400, LanSyncProtocol.Error("bad release"))
+                } else {
+                    queue.release(release, link)
+                    respondJson(out, 200, RemoteQueue.ReleaseRequest(release.items))
+                }
+            }
+            "/downloads/done" -> {
+                val done = RemoteQueue.parse<RemoteQueue.DoneRequest>(body)
+                if (done == null) {
+                    respondJson(out, 400, LanSyncProtocol.Error("bad events"))
+                } else {
+                    respondJson(out, 200, queue.done(done))
+                }
+            }
+        }
+    }
+
     /** Keeps the port the device said it serves on, since the one it connects from is ephemeral. */
     private fun withPort(host: String, previous: String?): String {
         val port = previous?.substringAfterLast(':', "")?.takeIf { it.isNotEmpty() && ':' in previous }
@@ -328,5 +391,6 @@ class LanSyncServer(
         const val MAX_CONNECTIONS = 4
         const val READ_TIMEOUT_MS = 30_000
         val AUTHED_ROUTES = setOf("/manifest", "/backup", "/file")
+        val KEYED_ROUTES = setOf("/queue", "/queue/claim", "/queue/release", "/downloads/done")
     }
 }

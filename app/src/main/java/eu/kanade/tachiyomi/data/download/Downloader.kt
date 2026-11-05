@@ -43,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import logcat.LogPriority
 import mihon.core.archive.ZipWriter
+import mihon.data.lansync.RemoteQueueStore
 import mihon.data.remote.RemoteMirror
 import mihon.data.remote.remoteChapterFileNames
 import nl.adaptivity.xmlutil.serialization.XML
@@ -86,6 +87,7 @@ class Downloader(
     private val store: DownloadStore,
     private val notifier: DownloadNotifier,
     private val remoteMirror: RemoteMirror,
+    private val remoteQueue: RemoteQueueStore,
 ) {
     /**
      * Queue where active downloads are kept.
@@ -130,6 +132,9 @@ class Downloader(
         pending.forEach { if (it.status != Download.State.QUEUE) it.status = Download.State.QUEUE }
 
         isPaused = false
+
+        // Everything left is being downloaded by a linked PC: nothing for this phone to do
+        if (pending.all { remoteQueue.isClaimed(it) }) return false
 
         launchDownloaderJob()
 
@@ -192,11 +197,14 @@ class Downloader(
             val activeDownloadsFlow = combine(
                 queueState,
                 downloadPreferences.parallelSourceLimit.changes(),
-            ) { a, b -> a to b }.transformLatest { (queue, parallelCount) ->
+                remoteQueue.state,
+            ) { a, b, c -> Triple(a, b, c) }.transformLatest { (queue, parallelCount, remote) ->
                 while (true) {
                     val activeDownloads = queue.asSequence()
                         // Ignore completed downloads, leave them in the queue
                         .filter { it.status.value <= Download.State.DOWNLOADING.value }
+                        // A linked PC is downloading these; they stay queued here, paused
+                        .filter { !remoteQueue.isClaimed(it, remote) }
                         .groupBy { it.source }
                         .toList()
                         .take(parallelCount)
@@ -772,7 +780,9 @@ class Downloader(
      * Returns true if all the queued downloads are in DOWNLOADED or ERROR state.
      */
     private fun areAllDownloadsFinished(): Boolean {
-        return queueState.value.none { it.status.value <= Download.State.DOWNLOADING.value }
+        return queueState.value.none {
+            it.status.value <= Download.State.DOWNLOADING.value && !remoteQueue.isClaimed(it)
+        }
     }
 
     private fun addAllToQueue(downloads: List<Download>) {

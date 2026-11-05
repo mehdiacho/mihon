@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import mihon.data.lansync.RemoteQueueStore
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -32,18 +33,24 @@ import kotlin.time.Duration.Companion.seconds
 @ContributesIntoMap(AppScope::class)
 class DownloadQueueViewModel(
     private val downloadManager: DownloadManager,
+    private val remoteQueue: RemoteQueueStore,
 ) : ViewModel() {
 
-    val state: StateFlow<List<DownloadHeaderItem>> = downloadManager.queueState
-        .map { downloads ->
-            downloads
-                .groupBy { it.source }
-                .map { entry ->
-                    DownloadHeaderItem(entry.key.id, entry.key.name, entry.value.size).apply {
-                        addSubItems(0, entry.value.map { DownloadItem(it, this) })
-                    }
+    val state: StateFlow<List<DownloadHeaderItem>> = combine(
+        downloadManager.queueState,
+        remoteQueue.state,
+    ) { downloads, remote ->
+        downloads
+            .groupBy { it.source }
+            .map { entry ->
+                DownloadHeaderItem(entry.key.id, entry.key.name, entry.value.size).apply {
+                    addSubItems(
+                        0,
+                        entry.value.map { DownloadItem(it, this, remoteQueue.claimOn(it, remote)?.byName) },
+                    )
                 }
-        }
+            }
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5.seconds), emptyList())
 
     lateinit var controllerBinding: DownloadListBinding

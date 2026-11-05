@@ -49,6 +49,10 @@ class LanSyncPreferences(
     /** JSON list of [LanSyncLink.Link]. App state like the rest: keys must never travel in a backup. */
     val links: Preference<String> = preferenceStore.getString(Preference.appStateKey("lan_sync_links"), "")
 
+    /** JSON [RemoteQueue.State]: claims by linked PCs, applied event ids, who holds what. */
+    val remoteQueue: Preference<String> =
+        preferenceStore.getString(Preference.appStateKey("lan_sync_remote_queue"), "")
+
     /** Joining another device's profile, from a link the user confirmed. */
     fun adoptProfile(id: String, name: String) {
         profileIdPref.set(id)
