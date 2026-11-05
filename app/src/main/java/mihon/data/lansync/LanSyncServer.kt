@@ -89,11 +89,14 @@ class LanSyncServer(
         if (socket != null) return
         preferences.currentPairCode()
 
-        val server = (0 until LanSyncProtocol.PORT_ATTEMPTS).firstNotNullOfOrNull { offset ->
+        // This install's own port first, so two installs on one phone keep theirs whatever order they start in
+        val range = LanSyncProtocol.DEFAULT_PORT until LanSyncProtocol.DEFAULT_PORT + LanSyncProtocol.PORT_ATTEMPTS
+        val ports = listOfNotNull(preferences.lastPort.get().takeIf { it in range }) + range
+        val server = ports.distinct().firstNotNullOfOrNull { port ->
             try {
                 ServerSocket().apply {
                     reuseAddress = true
-                    bind(InetSocketAddress(LanSyncProtocol.DEFAULT_PORT + offset))
+                    bind(InetSocketAddress(port))
                 }
             } catch (_: IOException) {
                 null
@@ -104,6 +107,7 @@ class LanSyncServer(
             return
         }
         socket = server
+        preferences.lastPort.set(server.localPort)
         lockout.reset()
 
         // A few pulls at once at most; past that a caller gets refused rather than queued forever
