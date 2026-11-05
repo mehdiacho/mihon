@@ -76,7 +76,6 @@ object SettingsRemoteStorageScreen : SearchableSettings {
         val folder by prefs.folder.collectAsState()
         val username by prefs.username.collectAsState()
         val password by prefs.password.collectAsState()
-        val readAhead by prefs.readAheadChapters.collectAsState()
         val cacheSizeMb by prefs.cacheSizeMb.collectAsState()
         val evicts by prefs.evictAfterUpload.collectAsState()
         val evictWhen by prefs.evictWhen.collectAsState()
@@ -108,7 +107,7 @@ object SettingsRemoteStorageScreen : SearchableSettings {
             ),
             Preference.PreferenceGroup(
                 title = stringResource(MR.strings.pref_remote_storage_connection),
-                enabled = enabled,
+                visible = enabled,
                 preferenceItems = listOf(
                     Preference.PreferenceItem.EditTextPreference(
                         preference = prefs.host,
@@ -254,7 +253,7 @@ object SettingsRemoteStorageScreen : SearchableSettings {
             ),
             Preference.PreferenceGroup(
                 title = stringResource(MR.strings.pref_category_remote_storage_behaviour),
-                enabled = enabled,
+                visible = enabled,
                 preferenceItems = listOf(
                     Preference.PreferenceItem.ListPreference(
                         preference = prefs.role,
@@ -275,7 +274,7 @@ object SettingsRemoteStorageScreen : SearchableSettings {
             ),
             Preference.PreferenceGroup(
                 title = stringResource(MR.strings.pref_category_remote_storage_local),
-                enabled = enabled,
+                visible = enabled,
                 preferenceItems = listOf(
                     Preference.PreferenceItem.SwitchPreference(
                         preference = prefs.onlyOverWifi,
@@ -291,10 +290,10 @@ object SettingsRemoteStorageScreen : SearchableSettings {
                         preference = prefs.evictWhen,
                         entries = evictionEntries(),
                         title = stringResource(MR.strings.pref_remote_storage_evict_when),
-                        enabled = evicts,
+                        visible = evicts,
                     ),
                     Preference.PreferenceItem.SliderPreference(
-                        value = evictAfterDays,
+                        preference = prefs.evictAfterDays,
                         valueRange = 1..90,
                         title = stringResource(MR.strings.pref_remote_storage_evict_days),
                         subtitle = pluralStringResource(
@@ -304,29 +303,26 @@ object SettingsRemoteStorageScreen : SearchableSettings {
                         ),
                         // Only means anything for the grace-period policy, and
                         // a slider that changes nothing is worse than no slider.
-                        enabled = evicts && evictWhen == EvictionTiming.AFTER_DAYS,
-                        onValueChanged = { prefs.evictAfterDays.set(it) },
+                        visible = evicts && evictWhen == EvictionTiming.AFTER_DAYS,
                     ),
                     Preference.PreferenceItem.SliderPreference(
-                        value = readAhead,
+                        preference = prefs.readAheadChapters,
                         valueRange = 0..5,
                         title = stringResource(MR.strings.pref_remote_storage_read_ahead),
                         subtitle = stringResource(MR.strings.pref_remote_storage_read_ahead_summary),
-                        onValueChanged = { prefs.readAheadChapters.set(it) },
                     ),
                     Preference.PreferenceItem.SliderPreference(
-                        value = cacheSizeMb,
+                        preference = prefs.cacheSizeMb,
                         valueRange = 256..8192,
                         steps = 30,
                         title = stringResource(MR.strings.pref_remote_storage_cache_size),
                         subtitle = stringResource(MR.strings.pref_remote_storage_cache_size_summary, cacheSizeMb),
-                        onValueChanged = { prefs.cacheSizeMb.set(it) },
                     ),
                 ),
             ),
             Preference.PreferenceGroup(
                 title = stringResource(MR.strings.pref_category_remote_storage_migrate),
-                enabled = enabled,
+                visible = enabled,
                 preferenceItems = listOf(
                     Preference.PreferenceItem.TextPreference(
                         title = stringResource(MR.strings.pref_remote_storage_sweep),

@@ -10,10 +10,11 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
 import dev.zacsweers.metro.Inject
 import eu.kanade.tachiyomi.util.system.workManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import mihon.app.di.AppGraph
 import mihon.core.metro.metroGraph
-import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
 import java.util.concurrent.TimeUnit
 
@@ -48,12 +49,12 @@ class RemoteUploadJob(private val context: Context, workerParams: WorkerParamete
         }
 
         var anyFailed = false
-        withIOContext {
+        withContext(Dispatchers.IO) {
             // Re-read the queue each pass rather than snapshotting it, so a
             // chapter that finished downloading while this was running is
             // picked up in the same run instead of waiting for the next.
             for (entry in uploadQueue.items()) {
-                if (isStopped) return@withIOContext
+                if (isStopped) return@withContext
                 val done = runCatching { mirror.uploadOne(entry) }
                     .onFailure { logcat(LogPriority.ERROR, it) { "Mirror upload failed: ${entry.segments}" } }
                     .getOrDefault(false)
