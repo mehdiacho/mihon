@@ -30,8 +30,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Dependency Review
-        # Needs the dependency graph, which this fork doesn't have turned on
-        if: github.event_name == 'pull_request' && github.repository == 'mihonapp/mihon'
+        if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
 
       - name: Set up JDK
