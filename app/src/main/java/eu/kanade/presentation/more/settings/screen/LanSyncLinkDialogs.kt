@@ -10,6 +10,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,7 +37,7 @@ import tachiyomi.presentation.core.i18n.stringResource
  * from the computer's QR code. Walks through a profile mismatch and the optional restore.
  */
 @Composable
-internal fun LinkComputerDialog(onDismissRequest: () -> Unit) {
+internal fun LinkComputerDialog(onDismissRequest: () -> Unit, initialInvite: String? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val linker = remember { context.appGraph.lanSyncLinker }
@@ -60,6 +61,9 @@ internal fun LinkComputerDialog(onDismissRequest: () -> Unit) {
         address = "${invite.host}:${invite.port}"
         invite.code?.let { code = it }
     }
+
+    // An invite the app was opened with fills the fields; linking still waits for the user to tap Link
+    LaunchedEffect(initialInvite) { initialInvite?.let(::applyInvite) }
 
     fun attempt(afterJoin: Boolean = false) {
         val invite = LanSyncLink.parseInvite(address)

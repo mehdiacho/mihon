@@ -14,6 +14,7 @@ import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.more.settings.screen.SettingsAppearanceScreen
 import eu.kanade.presentation.more.settings.screen.SettingsDataScreen
+import eu.kanade.presentation.more.settings.screen.SettingsLanSyncScreen
 import eu.kanade.presentation.more.settings.screen.SettingsMainScreen
 import eu.kanade.presentation.more.settings.screen.SettingsRemoteStorageScreen
 import eu.kanade.presentation.more.settings.screen.SettingsTrackingScreen
@@ -40,6 +41,7 @@ class SettingsScreen(
                     Destination.DataAndStorage.id -> SettingsDataScreen
                     Destination.Tracking.id -> SettingsTrackingScreen
                     Destination.RemoteStorage.id -> SettingsRemoteStorageScreen
+                    Destination.LanSync.id -> SettingsLanSyncScreen
                     else -> SettingsMainScreen
                 },
                 onBackPressed = null,
@@ -62,6 +64,7 @@ class SettingsScreen(
                     Destination.DataAndStorage.id -> SettingsDataScreen
                     Destination.Tracking.id -> SettingsTrackingScreen
                     Destination.RemoteStorage.id -> SettingsRemoteStorageScreen
+                    Destination.LanSync.id -> SettingsLanSyncScreen
                     else -> SettingsAppearanceScreen
                 },
                 onBackPressed = null,
@@ -87,5 +90,6 @@ class SettingsScreen(
         data object DataAndStorage : Destination(1)
         data object Tracking : Destination(2)
         data object RemoteStorage : Destination(3)
+        data object LanSync : Destination(4)
     }
 }

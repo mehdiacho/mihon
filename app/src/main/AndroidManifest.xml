@@ -82,6 +82,18 @@
                 <data android:host="extension-store" />
             </intent-filter>
 
+            <!-- Fork: a TachiMana link invite scanned with the camera or tapped elsewhere. No label, so with
+                 several installs the chooser names each one, and the pick is the profile that gets linked. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="tachimana" />
+                <data android:host="link" />
+            </intent-filter>
+
             <!-- Open backup files -->
             <intent-filter android:label="@string/pref_restore_backup">
                 <action android:name="android.intent.action.VIEW" />

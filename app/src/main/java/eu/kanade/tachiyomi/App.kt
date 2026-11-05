@@ -108,12 +108,21 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
     @Inject private lateinit var migrations: Set<Migration>
 
-    @Inject private lateinit var lanSyncServer: LanSyncServer
+    @Inject private lateinit var lanSyncServer: Lazy<LanSyncServer>
 
     @Inject @AppCoroutineScope
     private lateinit var scope: CoroutineScope
 
     private val disableIncognitoReceiver = DisableIncognitoReceiver()
+
+    private fun isMainProcess(): Boolean {
+        val process = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            getProcessName()
+        } else {
+            runCatching { java.io.File("/proc/self/cmdline").readText().trimEnd('\u0000') }.getOrNull()
+        }
+        return process == null || process == packageName
+    }
 
     @SuppressLint("LaunchActivityFromNotification")
     override fun onCreate() {
@@ -192,7 +201,9 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         // Updates widget update
         widgetManager.init(scope)
 
-        lanSyncServer.bind(scope)
+        // Only the main process serves LAN sync. The crash screen runs in its own process, where WorkManager is not
+        // initialized; building the server's graph there (it reaches RemoteMirror) crashed the crash screen itself.
+        if (isMainProcess()) lanSyncServer.value.bind(scope)
 
         if (!LogcatLogger.isInstalled) {
             val minLogPriority = when {

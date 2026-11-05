@@ -115,6 +115,7 @@ import mihon.core.metro.metroGraph
 import mihon.core.migration.Migrator
 import mihon.data.backup.RestoreFollowUp
 import mihon.data.cache.ChapterCache
+import mihon.data.lansync.LanSyncLink
 import mihon.domain.database.repository.DatabaseRepository
 import mihon.feature.support.SupportUsScreen
 import mihon.icons.materialsymbols.MaterialSymbols
@@ -666,8 +667,14 @@ class MainActivity : BaseActivity() {
                 null
             }
             Intent.ACTION_VIEW -> {
+                // Fork: a TachiMana link invite opens the link dialog, filled in, for the user to confirm
+                if (intent.scheme.equals(LanSyncLink.INVITE_SCHEME, ignoreCase = true)) {
+                    intent.dataString?.let { appGraph.lanSyncLinker.pendingInvite.value = it }
+                    navigator.popUntilRoot()
+                    navigator.push(SettingsScreen(SettingsScreen.Destination.LanSync))
+                }
                 // Handling opening of backup files
-                if (intent.data.toString().endsWith(".tachibk")) {
+                else if (intent.data.toString().endsWith(".tachibk")) {
                     navigator.popUntilRoot()
                     navigator.push(RestoreBackupScreen(intent.data.toString()))
                 }
