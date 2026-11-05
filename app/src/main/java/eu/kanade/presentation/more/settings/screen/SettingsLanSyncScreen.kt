@@ -55,7 +55,7 @@ object SettingsLanSyncScreen : SearchableSettings {
             ),
             Preference.PreferenceGroup(
                 title = stringResource(MR.strings.pref_lan_sync_pairing),
-                enabled = enabled,
+                visible = enabled,
                 preferenceItems = listOf(
                     Preference.PreferenceItem.TextPreference(
                         title = stringResource(MR.strings.pref_lan_sync_code),

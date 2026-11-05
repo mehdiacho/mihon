@@ -37,7 +37,7 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.WarningBanner
 import eu.kanade.presentation.util.Screen
-import eu.kanade.tachiyomi.data.backup.create.BackupCreateJob
+import eu.kanade.tachiyomi.data.backup.create.BackupCreateWorker
 import eu.kanade.tachiyomi.data.backup.create.BackupCreator
 import eu.kanade.tachiyomi.data.backup.create.BackupOptions
 import eu.kanade.tachiyomi.util.system.DeviceUtil
@@ -118,10 +118,13 @@ class CreateBackupScreen : Screen() {
                 actionLabel = stringResource(MR.strings.action_create),
                 actionEnabled = state.options.canCreate(),
                 onClickAction = {
-                    when {
-                        BackupCreateJob.isManualJobRunning(context) -> context.toast(MR.strings.backup_in_progress)
-                        viewModel.needsPassphrase() -> askPassphrase = true
-                        else -> chooseLocation()
+                    scope.launch {
+                        when {
+                            BackupCreateWorker.isManualJobRunning(context) ->
+                                context.toast(MR.strings.backup_in_progress)
+                            viewModel.needsPassphrase() -> askPassphrase = true
+                            else -> chooseLocation()
+                        }
                     }
                 },
             ) {
@@ -256,7 +259,7 @@ class CreateBackupViewModel(
         if (options.remoteStoragePassword && sealedNasPassword == null) {
             context.toast(MR.strings.backup_nas_no_password)
         }
-        BackupCreateJob.startNow(context, uri, options, sealedNasPassword.takeIf { options.remoteStoragePassword })
+        BackupCreateWorker.startNow(context, uri, options, sealedNasPassword.takeIf { options.remoteStoragePassword })
         sealedNasPassword = null
     }
 

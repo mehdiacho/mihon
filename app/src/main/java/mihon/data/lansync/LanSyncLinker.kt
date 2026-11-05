@@ -6,7 +6,7 @@ import androidx.work.WorkManager
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreJob
+import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreWorker
 import eu.kanade.tachiyomi.data.backup.restore.RestoreOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -122,6 +122,6 @@ class LanSyncLinker(
             if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
             file.outputStream().use { response.body.byteStream().copyTo(it) }
         }
-        BackupRestoreJob.start(WorkManager.getInstance(context), Uri.fromFile(file), RestoreOptions())
+        BackupRestoreWorker.start(WorkManager.getInstance(context), Uri.fromFile(file), RestoreOptions())
     }
 }

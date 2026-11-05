@@ -43,6 +43,7 @@ import tachiyomi.domain.manga.interactor.GetMangaByUrlAndSourceId
 import tachiyomi.i18n.MR
 import java.io.File
 import kotlin.time.Duration.Companion.minutes
+import mihon.icons.materialsymbols.R as MaterialSymbolsR
 
 /**
  * What a restore leaves for afterwards: the parts of a backup that can't simply be written to the
@@ -184,7 +185,7 @@ class RestoreFollowUp(
         ) {
             setContentIntent(install)
             addAction(
-                R.drawable.ic_download_chapter_24dp,
+                MaterialSymbolsR.drawable.rounded_download,
                 context.stringResource(MR.strings.restore_install_all),
                 install,
             )
@@ -218,17 +219,17 @@ class RestoreFollowUp(
             text = context.pluralStringResource(MR.plurals.restore_downloads_offer, count, count),
         ) {
             addAction(
-                R.drawable.ic_download_chapter_24dp,
+                MaterialSymbolsR.drawable.rounded_download,
                 context.stringResource(MR.strings.all),
                 RestoreFollowUpReceiver.broadcast(context, RestoreFollowUpReceiver.ACTION_DOWNLOAD_ALL),
             )
             addAction(
-                R.drawable.ic_download_chapter_24dp,
+                MaterialSymbolsR.drawable.rounded_download,
                 context.stringResource(MR.strings.restore_downloads_unread_only),
                 RestoreFollowUpReceiver.broadcast(context, RestoreFollowUpReceiver.ACTION_DOWNLOAD_UNREAD),
             )
             addAction(
-                R.drawable.ic_close_24dp,
+                MaterialSymbolsR.drawable.rounded_close,
                 context.stringResource(MR.strings.restore_downloads_no),
                 RestoreFollowUpReceiver.broadcast(context, RestoreFollowUpReceiver.ACTION_DOWNLOAD_NONE),
             )

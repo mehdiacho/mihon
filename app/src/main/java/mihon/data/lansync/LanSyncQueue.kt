@@ -121,7 +121,7 @@ class LanSyncQueue(
         // Finished elsewhere, so not wanted here any more
         val done = result.fresh.mapTo(HashSet()) { it.ref }
         val finished = queue().filter { RemoteQueueStore.refOf(it) in done }
-        if (finished.isNotEmpty()) downloadManager.cancelQueuedDownloads(finished)
+        if (finished.isNotEmpty()) scope.launch { downloadManager.cancelQueuedDownloads(finished) }
 
         if (result.fresh.any { it.where == RemoteQueue.WHERE_SENT }) downloadCache.invalidateCache()
         result.fresh
