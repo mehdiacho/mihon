@@ -67,6 +67,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import dev.zacsweers.metro.HasMemberInjections
 import dev.zacsweers.metro.Inject
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.presentation.reader.DisplayRefreshHost
@@ -125,7 +126,8 @@ import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.presentation.core.util.collectAsState
 
-class ReaderActivity : BaseActivity() {
+@HasMemberInjections
+open class ReaderActivity : BaseActivity() {
 
     private val graph: AppGraph by lazy { metroGraph() }
 

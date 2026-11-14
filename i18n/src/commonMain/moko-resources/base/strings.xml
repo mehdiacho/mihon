@@ -156,6 +156,8 @@
     <string name="action_revert_to_default">Revert to default</string>
     <!-- missing undo feature after Compose rewrite #7454 -->
     <string name="action_close">Close</string>
+    <string name="quick_search_hint">Search sources</string>
+    <string name="quick_search_open_in_app">Open in app</string>
     <string name="action_show_errors">Tap to see details</string>
     <string name="action_restore">Restore</string>
     <string name="action_webview_back">Back</string>

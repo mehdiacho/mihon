@@ -562,6 +562,23 @@
     <!--== AMOLED Mode Overlay ==-->
     <style name="ThemeOverlay.Tachiyomi.Amoled" parent="" />
 
+    <!--== Quick search overlay (mihon#12) ==-->
+    <!-- Manifest theme: translucent, so the app underneath stays visible. -->
+    <style name="Theme.Tachiyomi.QuickSearch" parent="Theme.Tachiyomi">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+
+    <!-- Re-applied after BaseActivity switches to the user's (opaque) app theme. -->
+    <style name="ThemeOverlay.Tachiyomi.QuickSearch" parent="">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+
     <!--===============-->
     <!-- Launch Screen -->
     <!--===============-->

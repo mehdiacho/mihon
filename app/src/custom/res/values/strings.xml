@@ -3,4 +3,7 @@
     <!-- Overrides the value from the :i18n module so all three installs have
          distinct launcher labels. -->
     <string name="app_name" translatable="false">Mihon Custom</string>
+    <string name="quick_search_label" translatable="false">Mihon Custom search</string>
+    <string name="quick_search_process_text" translatable="false">Search in Mihon Custom</string>
+    <string name="quick_search_tile" translatable="false">Mihon Custom search</string>
 </resources>

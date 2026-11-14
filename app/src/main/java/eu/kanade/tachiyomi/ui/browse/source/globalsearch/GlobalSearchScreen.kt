@@ -14,6 +14,7 @@ import eu.kanade.presentation.browse.GlobalSearchScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.browse.source.browse.BrowseSourceScreen
 import eu.kanade.tachiyomi.ui.manga.MangaScreen
+import mihon.feature.quicksearch.LocalQuickSearchHost
 import tachiyomi.presentation.core.screens.LoadingScreen
 
 class GlobalSearchScreen(
@@ -24,6 +25,8 @@ class GlobalSearchScreen(
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
+        // Fork: in the quick search drawer this is the first screen, and up closes the drawer
+        val quickSearch = LocalQuickSearchHost.current
 
         val viewModel =
             assistedMetroViewModel<GlobalSearchViewModel, GlobalSearchViewModel.Factory> {
@@ -55,9 +58,20 @@ class GlobalSearchScreen(
         } else {
             GlobalSearchScreen(
                 state = state,
-                navigateUp = navigator::pop,
+                navigateUp = {
+                    if (quickSearch != null &&
+                        !navigator.canPop
+                    ) {
+                        quickSearch.dismiss()
+                    } else {
+                        navigator.pop()
+                    }
+                },
                 onChangeSearchQuery = viewModel::updateSearchQuery,
-                onSearch = { viewModel.search() },
+                onSearch = {
+                    viewModel.search()
+                    quickSearch?.query = state.searchQuery.orEmpty()
+                },
                 getManga = { viewModel.getManga(it) },
                 onChangeSearchFilter = viewModel::setSourceFilter,
                 onToggleResults = viewModel::toggleFilterResults,
