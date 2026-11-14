@@ -49,6 +49,7 @@ import mihon.data.lansync.LanSyncLinks
 import mihon.data.lansync.LanSyncPreferences
 import mihon.data.lansync.LanSyncQueue
 import mihon.data.lansync.LanSyncServer
+import mihon.data.lansync.LanSyncSync
 import mihon.data.lansync.RemoteQueueStore
 import mihon.data.remote.MirrorExistingDownloads
 import mihon.data.remote.RemoteClientProvider
@@ -126,6 +127,7 @@ interface AppGraph : ViewModelGraph {
     val lanSyncLinks: LanSyncLinks
     val lanSyncLinker: LanSyncLinker
     val lanSyncQueue: LanSyncQueue
+    val lanSyncSync: LanSyncSync
     val remoteQueueStore: RemoteQueueStore
 
     val crashLogUtil: CrashLogUtil

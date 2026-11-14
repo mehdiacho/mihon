@@ -77,6 +77,7 @@ import eu.kanade.presentation.components.IncognitoModeBannerBackgroundColor
 import eu.kanade.presentation.components.IndexingBannerBackgroundColor
 import eu.kanade.presentation.more.AppMigratingScreen
 import eu.kanade.presentation.more.settings.screen.LinkComputerDialog
+import eu.kanade.presentation.more.settings.screen.TakeRequestDialog
 import eu.kanade.presentation.more.settings.screen.browse.ExtensionStoresScreen
 import eu.kanade.presentation.more.settings.screen.data.RestoreBackupScreen
 import eu.kanade.presentation.util.AssistContentScreen
@@ -302,6 +303,11 @@ class MainActivity : BaseActivity() {
                         onDismissRequest = { lanSyncLinker.pendingInvite.value = null },
                     )
                 }
+
+                // Fork: a full copy waiting for an answer (roles/1's take)
+                val lanSyncSync = remember { appGraph.lanSyncSync }
+                val pendingTake by lanSyncSync.pendingTake.collectAsState()
+                pendingTake?.let { take -> TakeRequestDialog(take, onAnswer = lanSyncSync::answerTake) }
 
                 // Pop source-related screens when incognito mode is turned off
                 LaunchedEffect(Unit) {

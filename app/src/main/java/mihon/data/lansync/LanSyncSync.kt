@@ -297,7 +297,7 @@ class LanSyncSync(
         if (takes.firstTime(take.requestId)) {
             preferences.takes.set(json.encodeToString(takes.remembered))
             scope.launch {
-                val outcome = runTake(link, take.how)
+                val outcome = runTake(link, take.how, ask = true, fromPeer = true)
                 report(link, take.requestId, outcome)
             }
         }
@@ -310,6 +310,8 @@ class LanSyncSync(
     suspend fun changeMode(link: LanSyncLink.Link, mode: String): Result<String> = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
         links.setMode(link.peerDeviceId, mode, now)
+        // A computer without roles/1 keeps no mode; this side's still decides what it sends and takes
+        if (LanSyncRoles.CAPABILITY !in capabilitiesOf(link)) return@withContext Result.success(mode)
         val body = json.encodeToString(LanSyncRoles.Mode(LanSyncRoles.asCaller(mode), now))
         val (code, text) = call(
             link,
@@ -336,6 +338,9 @@ class LanSyncSync(
 
     /** "Send everything to the computer once", and "start from this phone's library". */
     suspend fun sendEverything(link: LanSyncLink.Link, how: String): Result<Unit> = withContext(Dispatchers.IO) {
+        if (LanSyncRoles.CAPABILITY !in capabilitiesOf(link)) {
+            return@withContext Result.failure(IOException("${link.peerName} can't take a copy from this phone yet"))
+        }
         val body = json.encodeToString(LanSyncRoles.TakeRequest(how, UUID.randomUUID().toString()))
         val (code, _) = call(
             link,
@@ -350,15 +355,63 @@ class LanSyncSync(
         }
     }
 
-    /** "Take everything from the computer once", and "start from the computer's library". Asks first, like a take from there. */
-    fun takeEverything(link: LanSyncLink.Link, how: String) {
+    /** "Take everything from the computer once": adds what the computer has; nothing here is removed. */
+    fun takeEverything(link: LanSyncLink.Link) {
+        scope.launch { finish(link, runTake(link, LanSyncRoles.HOW_MERGE, ask = false, fromPeer = false)) }
+    }
+
+    /** "Send everything to the computer once": the computer adds what this phone has, after asking there. */
+    fun sendEverythingOnce(link: LanSyncLink.Link) {
         scope.launch {
-            val outcome = runTake(link, how)
-            if (!outcome.ok &&
-                outcome.message != DECLINED
-            ) {
-                notice(outcome.message ?: "Couldn't copy from ${link.peerName}")
+            sendEverything(link, LanSyncRoles.HOW_MERGE)
+                .onSuccess { notice("Sent. ${link.peerName} asks before copying.") }
+                .onFailure { notice(it.message ?: "Couldn't reach ${link.peerName}") }
+        }
+    }
+
+    /** Where the library starts from, the first question after linking. */
+    enum class Start { MINE, THEIRS, COMBINE }
+
+    /**
+     * The two questions after linking (or "Change…"): which library to start from, then who leads.
+     * [start] is null when the phone has no library yet, or the person only changed who leads.
+     * Runs in the background, so leaving the screen doesn't stop it.
+     */
+    fun setUp(link: LanSyncLink.Link, start: Start?, mode: String) {
+        scope.launch {
+            changeMode(link, mode).onFailure { notice(it.message ?: "Couldn't tell ${link.peerName}") }
+            when (start) {
+                Start.MINE -> sendEverything(link, LanSyncRoles.HOW_REPLACE)
+                    .onSuccess { notice("Sent. ${link.peerName} asks before replacing its library.") }
+                    .onFailure { notice(it.message ?: "Couldn't reach ${link.peerName}") }
+                Start.THEIRS -> finish(link, runTake(link, LanSyncRoles.HOW_REPLACE, ask = true, fromPeer = false))
+                Start.COMBINE -> {
+                    val outcome = runTake(link, LanSyncRoles.HOW_MERGE, ask = false, fromPeer = false)
+                    finish(link, outcome)
+                    if (outcome.ok) {
+                        sendEverything(link, LanSyncRoles.HOW_MERGE)
+                            .onFailure { notice(it.message ?: "Couldn't reach ${link.peerName}") }
+                    }
+                }
+                null -> Unit
             }
+        }
+    }
+
+    /** A first link from a phone with no library: the computer's is added, nothing to ask. */
+    fun startEmpty(link: LanSyncLink.Link, mode: String) {
+        scope.launch {
+            changeMode(link, mode)
+            finish(link, runTake(link, LanSyncRoles.HOW_MERGE, ask = false, fromPeer = false))
+        }
+    }
+
+    suspend fun hasLibrary(): Boolean = getFavorites.await().isNotEmpty()
+
+    private suspend fun finish(link: LanSyncLink.Link, outcome: Outcome) {
+        when {
+            outcome.ok -> notice("Copied from ${link.peerName}")
+            outcome.message != DECLINED -> notice(outcome.message ?: "Couldn't copy from ${link.peerName}")
         }
     }
 
@@ -367,6 +420,8 @@ class LanSyncSync(
     /** A take waiting for the person: how many manga each side has, and what will happen. */
     data class PendingTake(
         val peerName: String,
+        /** True when the computer asked for it; false when it was started on this phone. */
+        val fromPeer: Boolean,
         val how: String,
         val theirs: Int,
         val mine: Int,
@@ -386,16 +441,24 @@ class LanSyncSync(
     private val takeMutex = Mutex()
 
     /** Copies [link]'s library through `pull/1` once the person says yes. */
-    private suspend fun runTake(link: LanSyncLink.Link, how: String): Outcome = takeMutex.withLock {
+    private suspend fun runTake(
+        link: LanSyncLink.Link,
+        how: String,
+        ask: Boolean,
+        fromPeer: Boolean,
+    ): Outcome = takeMutex.withLock {
         try {
             val file = linker.value.downloadBackup(link)
             val theirs = backupDecoder.decodeMetadata(Uri.fromFile(file)).entryCount
             val mine = getFavorites.await().size
 
-            val answer = CompletableDeferred<Boolean>()
-            _pendingTake.value = PendingTake(link.peerName, how, theirs, mine, answer)
-            notice(takeNotice(link.peerName))
-            if (!answer.await()) return@withLock Outcome(false, DECLINED)
+            // A take the computer asked for, and every replace, waits for the person
+            if (ask || how == LanSyncRoles.HOW_REPLACE) {
+                val answer = CompletableDeferred<Boolean>()
+                _pendingTake.value = PendingTake(link.peerName, fromPeer, how, theirs, mine, answer)
+                if (fromPeer) notice(takeNotice(link.peerName))
+                if (!answer.await()) return@withLock Outcome(false, DECLINED)
+            }
 
             if (how == LanSyncRoles.HOW_REPLACE) {
                 saveBackupBeforeReplace(link)

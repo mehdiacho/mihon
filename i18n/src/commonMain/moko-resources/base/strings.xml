@@ -1230,23 +1230,51 @@
     <string name="pref_lan_sync_unlink_title">Unlink %1$s?</string>
     <string name="pref_lan_sync_unlink_text">It will need the pairing code to link again.</string>
     <string name="pref_lan_sync_unlink">Unlink</string>
+    <!-- roles/1: the two questions after linking, also under "Change…" -->
+    <string name="lan_sync_start_title">Start from which library?</string>
+    <string name="lan_sync_start_text">%1$s and this phone each have a library. Sync starts from:</string>
+    <string name="lan_sync_start_mine">This phone's</string>
+    <string name="lan_sync_start_theirs">%1$s's</string>
+    <string name="lan_sync_start_combine">Both, combined</string>
+    <string name="lan_sync_start_keep">Leave both as they are</string>
+    <string name="lan_sync_mode_title">Who leads?</string>
+    <string name="lan_sync_mode_text">A follower keeps working as usual. Its own changes stay on it until it stops following.</string>
+    <string name="lan_sync_mode_both">Both ways</string>
+    <string name="lan_sync_mode_i_lead">This phone leads, %1$s follows</string>
+    <string name="lan_sync_mode_they_lead">%1$s leads, this phone follows</string>
+    <string name="lan_sync_mode_short_both">Sync both ways</string>
+    <string name="lan_sync_mode_short_lead">Leader</string>
+    <string name="lan_sync_mode_short_follow">Follower</string>
+    <string name="lan_sync_next">Next</string>
+    <string name="lan_sync_done">Done</string>
+    <string name="lan_sync_change">Change…</string>
+    <string name="lan_sync_send_once">Send everything to %1$s once</string>
+    <string name="lan_sync_take_once">Take everything from %1$s once</string>
+    <!-- A full copy: %1$s the computer, %2$d its manga, %3$d this phone's -->
+    <string name="lan_sync_take_title">Copy from %1$s?</string>
+    <string name="lan_sync_take_merge_peer">%1$s wants to add its library (%2$d manga) to this phone's (%3$d).</string>
+    <string name="lan_sync_take_replace_peer">%1$s wants to replace this phone's library (%3$d manga) with its own (%2$d). A backup of this phone is saved first.</string>
+    <string name="lan_sync_take_replace_local">Replace this phone's library (%3$d manga) with %1$s's (%2$d)? A backup of this phone is saved first.</string>
+    <string name="lan_sync_take_copy">Copy</string>
+    <string name="lan_sync_take_replace">Replace</string>
+    <string name="lan_sync_decline">Decline</string>
     <string name="download_on_device">Downloading on %1$s</string>
     <!-- A chapter held by a linked computer. %1$s is one device name, or several joined by commas. -->
     <string name="chapter_on_devices">On %1$s</string>
     <string name="pref_lan_sync_links_info">A linked device talks to this one without the code, using a key made when they linked. The network traffic is plain HTTP, so anyone on this Wi-Fi who can watch it could copy the key.</string>
     <!-- NAS connection in backups -->
-    <string name="backup_nas_connection">NAS connection</string>
-    <string name="backup_nas_password">NAS password, protected with a passphrase</string>
-    <string name="backup_nas_passphrase_title">Passphrase for the NAS password</string>
-    <string name="backup_nas_passphrase_text">You'll need this passphrase to get the NAS password back when you restore this backup. It isn't saved anywhere.</string>
+    <string name="backup_nas_connection">Remote storage connection</string>
+    <string name="backup_nas_password">Remote storage password, protected with a passphrase</string>
+    <string name="backup_nas_passphrase_title">Passphrase for the remote storage password</string>
+    <string name="backup_nas_passphrase_text">You'll need this passphrase to get the remote storage password back when you restore this backup. It isn't saved anywhere.</string>
     <string name="backup_nas_passphrase">Passphrase</string>
     <string name="backup_nas_passphrase_repeat">Repeat passphrase</string>
     <string name="backup_nas_passphrase_short">Use at least 8 characters</string>
     <string name="backup_nas_passphrase_mismatch">The passphrases don't match</string>
-    <string name="backup_nas_no_password">No NAS password is set, so there's none to include</string>
-    <string name="restore_nas_password_title">Restore the NAS password</string>
-    <string name="restore_nas_password_text">This backup includes the NAS password. Enter the passphrase it was protected with.</string>
+    <string name="backup_nas_no_password">No remote storage password is set, so there's none to include</string>
+    <string name="restore_nas_password_title">Restore the remote storage password</string>
+    <string name="restore_nas_password_text">This backup includes the remote storage password. Enter the passphrase it was protected with.</string>
     <string name="restore_nas_password_wrong">That passphrase doesn't open it</string>
-    <string name="restore_nas_password_done">NAS password restored</string>
+    <string name="restore_nas_password_done">Remote storage password restored</string>
     <string name="restore_nas_password_discard">Discard</string>
 </resources>
