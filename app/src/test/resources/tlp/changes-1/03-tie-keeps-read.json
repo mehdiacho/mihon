@@ -1,0 +1,57 @@
+{
+  "note": "Equal times: read beats unread.",
+  "held": [
+    {
+      "changeId": "z",
+      "deviceId": "pc",
+      "at": 2000,
+      "seq": 1,
+      "kind": "chapter.read",
+      "target": {
+        "sourceId": "2499283573021220255",
+        "mangaUrl": "/manga/x",
+        "chapterUrl": "/ch/12"
+      },
+      "value": {
+        "read": false,
+        "lastPageRead": 9
+      }
+    }
+  ],
+  "incoming": [
+    {
+      "changeId": "a",
+      "deviceId": "phone",
+      "at": 2000,
+      "seq": 1,
+      "kind": "chapter.read",
+      "target": {
+        "sourceId": "2499283573021220255",
+        "mangaUrl": "/manga/x",
+        "chapterUrl": "/ch/12"
+      },
+      "value": {
+        "read": true,
+        "lastPageRead": 0
+      }
+    }
+  ],
+  "expect": {
+    "values": [
+      {
+        "kind": "chapter.read",
+        "target": {
+          "sourceId": "2499283573021220255",
+          "mangaUrl": "/manga/x",
+          "chapterUrl": "/ch/12"
+        },
+        "value": {
+          "read": true,
+          "lastPageRead": 0
+        }
+      }
+    ],
+    "applied": 1,
+    "ignored": 0
+  }
+}

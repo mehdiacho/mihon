@@ -1,0 +1,21 @@
+{
+  "stored": {
+    "mode": "callerLeads",
+    "modeAt": 3000
+  },
+  "request": {
+    "method": "PUT",
+    "path": "/roles",
+    "body": {
+      "mode": "both",
+      "modeAt": 2000
+    }
+  },
+  "expect": {
+    "status": 409,
+    "body": {
+      "mode": "callerLeads",
+      "modeAt": 3000
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "note": "An older entry does not undo a newer one.",
+  "held": [
+    {
+      "changeId": "a",
+      "deviceId": "pc",
+      "at": 3000,
+      "seq": 1,
+      "kind": "chapter.read",
+      "target": {
+        "sourceId": "2499283573021220255",
+        "mangaUrl": "/manga/x",
+        "chapterUrl": "/ch/12"
+      },
+      "value": {
+        "read": false,
+        "lastPageRead": 5
+      }
+    }
+  ],
+  "incoming": [
+    {
+      "changeId": "b",
+      "deviceId": "phone",
+      "at": 2000,
+      "seq": 1,
+      "kind": "chapter.read",
+      "target": {
+        "sourceId": "2499283573021220255",
+        "mangaUrl": "/manga/x",
+        "chapterUrl": "/ch/12"
+      },
+      "value": {
+        "read": true,
+        "lastPageRead": 0
+      }
+    }
+  ],
+  "expect": {
+    "values": [
+      {
+        "kind": "chapter.read",
+        "target": {
+          "sourceId": "2499283573021220255",
+          "mangaUrl": "/manga/x",
+          "chapterUrl": "/ch/12"
+        },
+        "value": {
+          "read": false,
+          "lastPageRead": 5
+        }
+      }
+    ],
+    "applied": 0,
+    "ignored": 1
+  }
+}
