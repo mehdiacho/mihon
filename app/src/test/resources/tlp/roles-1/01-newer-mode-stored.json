@@ -1,0 +1,21 @@
+{
+  "stored": {
+    "mode": "both",
+    "modeAt": 1000
+  },
+  "request": {
+    "method": "PUT",
+    "path": "/roles",
+    "body": {
+      "mode": "serverLeads",
+      "modeAt": 2000
+    }
+  },
+  "expect": {
+    "status": 200,
+    "body": {
+      "mode": "serverLeads",
+      "modeAt": 2000
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "note": "A later read mark replaces an earlier unread.",
+  "held": [
+    {
+      "changeId": "a",
+      "deviceId": "pc",
+      "at": 1000,
+      "seq": 1,
+      "kind": "chapter.read",
+      "target": {
+        "sourceId": "2499283573021220255",
+        "mangaUrl": "/manga/x",
+        "chapterUrl": "/ch/12"
+      },
+      "value": {
+        "read": false,
+        "lastPageRead": 3
+      }
+    }
+  ],
+  "incoming": [
+    {
+      "changeId": "b",
+      "deviceId": "phone",
+      "at": 2000,
+      "seq": 1,
+      "kind": "chapter.read",
+      "target": {
+        "sourceId": "2499283573021220255",
+        "mangaUrl": "/manga/x",
+        "chapterUrl": "/ch/12"
+      },
+      "value": {
+        "read": true,
+        "lastPageRead": 0
+      }
+    }
+  ],
+  "expect": {
+    "values": [
+      {
+        "kind": "chapter.read",
+        "target": {
+          "sourceId": "2499283573021220255",
+          "mangaUrl": "/manga/x",
+          "chapterUrl": "/ch/12"
+        },
+        "value": {
+          "read": true,
+          "lastPageRead": 0
+        }
+      }
+    ],
+    "applied": 1,
+    "ignored": 0
+  }
+}

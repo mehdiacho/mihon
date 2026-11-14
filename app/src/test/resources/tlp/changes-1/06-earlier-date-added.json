@@ -1,0 +1,72 @@
+{
+  "note": "Adding on both: the later entry wins but the earlier date added is kept.",
+  "held": [
+    {
+      "changeId": "a",
+      "deviceId": "pc",
+      "at": 1000,
+      "seq": 1,
+      "kind": "manga.library",
+      "target": {
+        "sourceId": "2499283573021220255",
+        "mangaUrl": "/manga/x"
+      },
+      "value": {
+        "inLibrary": true,
+        "dateAdded": 1000,
+        "manga": {
+          "title": "X",
+          "author": null,
+          "artist": null,
+          "description": null,
+          "genres": [],
+          "status": 0,
+          "thumbnailUrl": null
+        }
+      }
+    }
+  ],
+  "incoming": [
+    {
+      "changeId": "b",
+      "deviceId": "phone",
+      "at": 2000,
+      "seq": 1,
+      "kind": "manga.library",
+      "target": {
+        "sourceId": "2499283573021220255",
+        "mangaUrl": "/manga/x"
+      },
+      "value": {
+        "inLibrary": true,
+        "dateAdded": 2000,
+        "manga": {
+          "title": "X",
+          "author": null,
+          "artist": null,
+          "description": null,
+          "genres": [],
+          "status": 0,
+          "thumbnailUrl": null
+        }
+      }
+    }
+  ],
+  "expect": {
+    "values": [
+      {
+        "kind": "manga.library",
+        "target": {
+          "sourceId": "2499283573021220255",
+          "mangaUrl": "/manga/x"
+        },
+        "value": {
+          "inLibrary": true,
+          "dateAdded": 1000
+        }
+      }
+    ],
+    "applied": 1,
+    "ignored": 0
+  }
+}

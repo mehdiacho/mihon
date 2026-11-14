@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import logcat.LogPriority
+import mihon.data.lansync.changes.ChangesWire
 import tachiyomi.core.common.util.system.logcat
 import java.io.BufferedOutputStream
 import java.io.IOException
@@ -49,6 +50,7 @@ class LanSyncServer(
     private val links: LanSyncLinks,
     private val queue: LanSyncQueue,
     private val receiver: LanSyncReceiver,
+    private val sync: LanSyncSync,
 ) {
 
     sealed interface State {
@@ -161,6 +163,9 @@ class LanSyncServer(
             when {
                 request == null -> respondJson(out, 400, LanSyncProtocol.Error("bad request"))
                 request.path == "/link" -> link(request, client, out)
+                request.path == "/hello" && request.method == "GET" ->
+                    respondJson(out, 200, sync.hello(deviceName))
+                request.path in SYNC_ROUTES -> synced(request, client, out)
                 request.path in KEYED_ROUTES -> keyed(request, client, out)
                 request.path == "/file" && request.method == "PUT" -> keyed(request, client, out)
                 request.method != "GET" -> respondJson(out, 405, LanSyncProtocol.Error("GET only"))
@@ -348,6 +353,62 @@ class LanSyncServer(
         }
     }
 
+    /** `changes/1`, `roles/1` and this phone's outbox. Only a linked device's key opens them. */
+    private fun synced(request: LanSyncProtocol.Request, client: Socket, out: OutputStream) {
+        val link = links.findByKey(request.header(LanSyncLink.LINK_KEY_HEADER))
+        if (link == null) {
+            respondJson(out, 401, LanSyncProtocol.Error("needs a link key"))
+            return
+        }
+        client.inetAddress?.hostAddress?.let { links.touch(link, withPort(it, link.lastAddress)) }
+        val method = request.method
+        val allowed = when (request.path) {
+            "/changes" -> setOf("GET", "POST")
+            "/roles" -> setOf("GET", "PUT")
+            "/roles/take" -> setOf("POST")
+            else -> setOf("GET")
+        }
+        if (method !in allowed) {
+            respondJson(out, 405, LanSyncProtocol.Error("${allowed.joinToString(" or ")} only"))
+            return
+        }
+        fun body(max: Long): String? = LanSyncLink.readBody(
+            client.getInputStream(),
+            request.header("content-length"),
+            max.toInt(),
+        )?.decodeToString()
+
+        val reply = when {
+            request.path == "/changes" && method == "GET" -> sync.getChanges(link, request.query)
+            request.path == "/changes" -> {
+                client.soTimeout = UPLOAD_READ_TIMEOUT_MS
+                val length = request.header("content-length")?.trim()?.toLongOrNull()
+                if (length != null && length > ChangesWire.MAX_BODY_BYTES) {
+                    LanSyncSync.Reply(413, json.encodeToString(LanSyncProtocol.Error("body too large")))
+                } else {
+                    body(ChangesWire.MAX_BODY_BYTES)?.let { runBlocking { sync.postChanges(link, it) } }
+                }
+            }
+            request.path == "/roles" && method == "GET" -> sync.getRoles(link)
+            request.path == "/roles" -> body(RemoteQueue.MAX_BODY_BYTES.toLong())?.let {
+                runBlocking { sync.putRoles(link, it) }
+            }
+            request.path == "/roles/take" -> body(RemoteQueue.MAX_BODY_BYTES.toLong())?.let { sync.postTake(link, it) }
+            else -> sync.outbox(link, request.query["since"])
+        }
+        if (reply == null) {
+            respondJson(out, 400, LanSyncProtocol.Error("bad body"))
+        } else {
+            respondRaw(out, reply.status, reply.body)
+        }
+    }
+
+    private fun respondRaw(out: OutputStream, status: Int, text: String) {
+        val bytes = text.toByteArray()
+        LanSyncProtocol.writeHead(out, status, "application/json; charset=utf-8", bytes.size.toLong())
+        out.write(bytes)
+    }
+
     /** `PUT /file`: a chapter the PC downloaded for this phone. Streams to a `.part`, then renames. */
     private fun upload(request: LanSyncProtocol.Request, client: Socket, out: OutputStream) {
         val target = LanSyncUpload.parseTarget(request.query["path"].orEmpty())
@@ -457,6 +518,7 @@ class LanSyncServer(
         const val DRAIN_TIMEOUT_MS = 2_000
         const val DRAIN_MAX_BYTES = 1024L * 1024
         val AUTHED_ROUTES = setOf("/manifest", "/backup", "/file")
+        val SYNC_ROUTES = setOf("/changes", "/roles", "/roles/take", "/outbox")
         val KEYED_ROUTES = setOf("/queue", "/queue/claim", "/queue/release", "/downloads/done")
     }
 }

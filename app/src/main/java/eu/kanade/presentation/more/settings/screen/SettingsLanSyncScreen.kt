@@ -99,6 +99,8 @@ object SettingsLanSyncScreen : SearchableSettings {
                         title = stringResource(MR.strings.pref_lan_sync_linked_devices),
                     ) {
                         var unlinking by remember { mutableStateOf<LanSyncLink.Link?>(null) }
+                        var open by remember { mutableStateOf<LanSyncLink.Link?>(null) }
+                        var changing by remember { mutableStateOf<LanSyncLink.Link?>(null) }
                         // The settings wrapper stacks its children, so the rows need their own column
                         Column {
                             if (linked.isEmpty()) {
@@ -110,10 +112,33 @@ object SettingsLanSyncScreen : SearchableSettings {
                             linked.forEach { link ->
                                 TextPreferenceWidget(
                                     title = link.peerName,
-                                    subtitle = listOfNotNull(link.platform, link.lastAddress).joinToString(" · "),
-                                    onPreferenceClick = { unlinking = link },
+                                    subtitle = listOfNotNull(link.platform, link.lastAddress, modeLabel(link.mode))
+                                        .joinToString(" · "),
+                                    onPreferenceClick = { open = link },
                                 )
                             }
+                        }
+                        open?.let { link ->
+                            LinkedDeviceDialog(
+                                link = link,
+                                onDismissRequest = { open = null },
+                                onChange = {
+                                    open = null
+                                    changing = link
+                                },
+                                onUnlink = {
+                                    open = null
+                                    unlinking = link
+                                },
+                            )
+                        }
+                        changing?.let { link ->
+                            SyncSetupDialog(
+                                link = link,
+                                askStart = true,
+                                changing = true,
+                                onDismissRequest = { changing = null },
+                            )
                         }
                         unlinking?.let { link ->
                             UnlinkDialog(

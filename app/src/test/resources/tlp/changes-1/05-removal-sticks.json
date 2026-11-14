@@ -1,0 +1,61 @@
+{
+  "note": "A removal stops an older add from bringing the manga back.",
+  "held": [
+    {
+      "changeId": "r",
+      "deviceId": "pc",
+      "at": 4000,
+      "seq": 1,
+      "kind": "manga.library",
+      "target": {
+        "sourceId": "2499283573021220255",
+        "mangaUrl": "/manga/x"
+      },
+      "value": {
+        "inLibrary": false
+      }
+    }
+  ],
+  "incoming": [
+    {
+      "changeId": "a",
+      "deviceId": "phone",
+      "at": 3000,
+      "seq": 1,
+      "kind": "manga.library",
+      "target": {
+        "sourceId": "2499283573021220255",
+        "mangaUrl": "/manga/x"
+      },
+      "value": {
+        "inLibrary": true,
+        "dateAdded": 3000,
+        "manga": {
+          "title": "X",
+          "author": null,
+          "artist": null,
+          "description": null,
+          "genres": [],
+          "status": 0,
+          "thumbnailUrl": null
+        }
+      }
+    }
+  ],
+  "expect": {
+    "values": [
+      {
+        "kind": "manga.library",
+        "target": {
+          "sourceId": "2499283573021220255",
+          "mangaUrl": "/manga/x"
+        },
+        "value": {
+          "inLibrary": false
+        }
+      }
+    ],
+    "applied": 0,
+    "ignored": 1
+  }
+}

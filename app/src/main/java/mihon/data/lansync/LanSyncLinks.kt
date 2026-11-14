@@ -44,6 +44,14 @@ class LanSyncLinks(
         write(all().filterNot { it.peerDeviceId == peerDeviceId })
     }
 
+    /** `roles/1`: the mode of the link with [peerDeviceId], in this install's terms. */
+    @Synchronized
+    fun setMode(peerDeviceId: String, mode: String, modeAt: Long) {
+        write(all().map { if (it.peerDeviceId == peerDeviceId) it.copy(mode = mode, modeAt = modeAt) else it })
+    }
+
+    fun find(peerDeviceId: String): LanSyncLink.Link? = all().firstOrNull { it.peerDeviceId == peerDeviceId }
+
     /** Where a linked device was last heard from, so this side can reach it back. */
     @Synchronized
     fun touch(link: LanSyncLink.Link, address: String) {

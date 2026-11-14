@@ -1,0 +1,56 @@
+{
+  "note": "The same changeId twice is applied once; history time is added once.",
+  "held": [],
+  "incoming": [
+    {
+      "changeId": "h1",
+      "deviceId": "phone",
+      "at": 5000,
+      "seq": 1,
+      "kind": "history.read",
+      "target": {
+        "sourceId": "2499283573021220255",
+        "mangaUrl": "/manga/x",
+        "chapterUrl": "/ch/12"
+      },
+      "value": {
+        "lastRead": 5000,
+        "timeRead": 60000
+      }
+    },
+    {
+      "changeId": "h1",
+      "deviceId": "phone",
+      "at": 5000,
+      "seq": 2,
+      "kind": "history.read",
+      "target": {
+        "sourceId": "2499283573021220255",
+        "mangaUrl": "/manga/x",
+        "chapterUrl": "/ch/12"
+      },
+      "value": {
+        "lastRead": 5000,
+        "timeRead": 60000
+      }
+    }
+  ],
+  "expect": {
+    "values": [
+      {
+        "kind": "history.read",
+        "target": {
+          "sourceId": "2499283573021220255",
+          "mangaUrl": "/manga/x",
+          "chapterUrl": "/ch/12"
+        },
+        "value": {
+          "lastRead": 5000,
+          "timeRead": 60000
+        }
+      }
+    ],
+    "applied": 1,
+    "ignored": 1
+  }
+}

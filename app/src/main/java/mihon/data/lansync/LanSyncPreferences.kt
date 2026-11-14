@@ -53,6 +53,12 @@ class LanSyncPreferences(
     val remoteQueue: Preference<String> =
         preferenceStore.getString(Preference.appStateKey("lan_sync_remote_queue"), "")
 
+    /** JSON list of this phone's outbox events (`roles/1` take reports), read by linked devices from `GET /outbox`. */
+    val outbox: Preference<String> = preferenceStore.getString(Preference.appStateKey("lan_sync_outbox"), "")
+
+    /** JSON list of `roles/1` take request ids already started, so a repeat isn't run twice. */
+    val takes: Preference<String> = preferenceStore.getString(Preference.appStateKey("lan_sync_takes"), "")
+
     /**
      * The port this install last served on, tried first next time. Two installs on one phone would
      * otherwise take ports in whatever order they start, and a linked PC would then reach the other

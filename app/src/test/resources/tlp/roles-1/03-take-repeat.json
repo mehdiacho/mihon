@@ -1,0 +1,28 @@
+{
+  "note": "The second request with the same requestId is accepted but not run again.",
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/roles/take",
+      "body": {
+        "how": "merge",
+        "requestId": "r1"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/roles/take",
+      "body": {
+        "how": "merge",
+        "requestId": "r1"
+      }
+    }
+  ],
+  "expect": {
+    "statuses": [
+      202,
+      202
+    ],
+    "runs": 1
+  }
+}

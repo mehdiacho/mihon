@@ -134,11 +134,14 @@ object LanSyncProtocol {
     fun writeHead(out: OutputStream, status: Int, contentType: String, contentLength: Long?) {
         val reason = when (status) {
             200 -> "OK"
+            202 -> "Accepted"
             400 -> "Bad Request"
             401 -> "Unauthorized"
             404 -> "Not Found"
             405 -> "Method Not Allowed"
             409 -> "Conflict"
+            410 -> "Gone"
+            413 -> "Content Too Large"
             429 -> "Too Many Requests"
             503 -> "Service Unavailable"
             else -> "Internal Server Error"

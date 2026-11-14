@@ -48,6 +48,7 @@ class LanSyncQueue(
     private val sourceManager: SourceManager,
     private val getManga: GetMangaByUrlAndSourceId,
     private val holdings: DeviceHoldingsStore,
+    private val sync: Lazy<LanSyncSync>,
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -174,6 +175,8 @@ class LanSyncQueue(
                 // What each computer holds for this profile, for the "on <device>" badges
                 holdings.refresh()
             }
+            // changes/1: pull, then push, to each computer that has it
+            sync.value.syncSoon()
         }
     }
 
