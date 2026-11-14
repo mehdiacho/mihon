@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lets Android's accessibility shortcut (button, two-finger swipe, volume keys) open quick search. -->
+<accessibility-shortcut-target xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/quick_search_shortcut_description"
+    android:summary="@string/quick_search_shortcut_summary" />

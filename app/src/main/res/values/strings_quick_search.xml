@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Quick search overlay (mihon#12). System-facing labels, kept here rather than in :i18n so each install
+         can name itself: two installs on one phone would otherwise show two identical entries. -->
+    <string name="quick_search_label" translatable="false">Mihon search</string>
+    <string name="quick_search_process_text" translatable="false">Search in Mihon</string>
+    <string name="quick_search_tile" translatable="false">Mihon search</string>
+    <string name="quick_search_shortcut_summary" translatable="false">Search your sources from any app</string>
+    <string name="quick_search_shortcut_description" translatable="false">Opens a search bar over the app you are using. Search results open in a drawer, where you can add a manga to your library or start reading. Swipe the drawer down to go back.</string>
+</resources>

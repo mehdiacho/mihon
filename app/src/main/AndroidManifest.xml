@@ -163,6 +163,49 @@
                 android:resource="@xml/searchable" />
         </activity>
 
+        <!-- Fork: quick search over the current app (mihon#12). -->
+        <activity
+            android:name="mihon.feature.quicksearch.QuickSearchActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:label="@string/quick_search_label"
+            android:launchMode="singleTask"
+            android:taskAffinity="${applicationId}.quicksearch"
+            android:theme="@style/Theme.Tachiyomi.QuickSearch"
+            android:windowSoftInputMode="adjustResize|stateVisible">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.ACCESSIBILITY_SHORTCUT_TARGET" />
+            </intent-filter>
+            <intent-filter android:label="@string/quick_search_process_text">
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityshortcut.target"
+                android:resource="@xml/quick_search_shortcut" />
+        </activity>
+
+        <activity
+            android:name="mihon.feature.quicksearch.OverlayReaderActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:taskAffinity="${applicationId}.quicksearch" />
+
+        <service
+            android:name="mihon.feature.quicksearch.QuickSearchTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_mihon"
+            android:label="@string/quick_search_tile"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <activity
             android:name=".ui.reader.ReaderActivity"
             android:exported="false"

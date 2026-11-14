@@ -64,7 +64,7 @@ import tachiyomi.domain.manga.model.Manga
 import tachiyomi.presentation.core.screens.LoadingScreen
 
 class MangaScreen(
-    private val mangaId: Long,
+    val mangaId: Long,
     val fromSource: Boolean = false,
 ) : Screen(), AssistContentScreen {
 

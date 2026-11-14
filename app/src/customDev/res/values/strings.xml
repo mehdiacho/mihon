@@ -3,4 +3,7 @@
     <!-- customDev is a separate install from custom (see app/build.gradle.kts), so it
          gets its own launcher label. -->
     <string name="app_name" translatable="false">Mihon Dev</string>
+    <string name="quick_search_label" translatable="false">Mihon Dev search</string>
+    <string name="quick_search_process_text" translatable="false">Search in Mihon Dev</string>
+    <string name="quick_search_tile" translatable="false">Mihon Dev search</string>
 </resources>
