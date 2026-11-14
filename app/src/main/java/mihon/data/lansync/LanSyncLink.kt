@@ -63,6 +63,9 @@ object LanSyncLink {
         val key: String,
         val lastAddress: String? = null,
         val platform: String? = null,
+        /** `roles/1`, from this install's side: [LanSyncRoles.BOTH], [LanSyncRoles.I_LEAD] or [LanSyncRoles.I_FOLLOW]. */
+        val mode: String = LanSyncRoles.BOTH,
+        val modeAt: Long = 0,
     )
 
     /** What a "Link a device" QR code carries. */

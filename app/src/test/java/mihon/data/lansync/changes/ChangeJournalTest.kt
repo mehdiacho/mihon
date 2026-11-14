@@ -87,7 +87,9 @@ class ChangeJournalTest {
     @Test
     fun `limit pages oldest first`() {
         val journal = ChangeJournal(MemoryJournalStore(), { "phone" })
-        repeat(5) { journal.record(ChangeKind.CHAPTER_BOOKMARK, target, buildJsonObject { put("bookmark", it % 2 == 0) }) }
+        repeat(5) {
+            journal.record(ChangeKind.CHAPTER_BOOKMARK, target, buildJsonObject { put("bookmark", it % 2 == 0) })
+        }
         val page = (journal.serve(1, 2, "pc") as ChangeJournal.Served.Page).page
         assertEquals(listOf(2L, 3L), page.changes.map { it.seq })
         assertEquals(3, page.next)

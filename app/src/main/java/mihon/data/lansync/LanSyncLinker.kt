@@ -118,7 +118,13 @@ class LanSyncLinker(
     }
 
     /** Pulls the linked device's backup and starts the normal restore with it. */
-    suspend fun restoreBackupFrom(link: LanSyncLink.Link) = withContext(Dispatchers.IO) {
+    suspend fun restoreBackupFrom(link: LanSyncLink.Link) {
+        val file = downloadBackup(link)
+        BackupRestoreWorker.start(WorkManager.getInstance(context), Uri.fromFile(file), RestoreOptions())
+    }
+
+    /** `pull/1`: the linked device's backup, into the cache. */
+    suspend fun downloadBackup(link: LanSyncLink.Link): File = withContext(Dispatchers.IO) {
         val address = link.lastAddress ?: throw IOException("No address for ${link.peerName}")
         val request = Request.Builder()
             .url("http://$address/backup")
@@ -129,6 +135,6 @@ class LanSyncLinker(
             if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
             file.outputStream().use { response.body.byteStream().copyTo(it) }
         }
-        BackupRestoreWorker.start(WorkManager.getInstance(context), Uri.fromFile(file), RestoreOptions())
+        file
     }
 }

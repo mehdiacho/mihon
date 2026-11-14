@@ -69,7 +69,11 @@ class ChangeJournal(
                 value = value,
             )
             val seq = store.append(change, clock())
-            store.setHeld(kind, key, ChangeRules.Held(at, change.changeId, ChangeRules.afterLocal(kind, held?.value, value)))
+            store.setHeld(
+                kind,
+                key,
+                ChangeRules.Held(at, change.changeId, ChangeRules.afterLocal(kind, held?.value, value)),
+            )
             change.copy(seq = seq)
         }
 
@@ -105,7 +109,11 @@ class ChangeJournal(
                     if (apply(change, decision.value)) {
                         store.transaction {
                             store.append(change.copy(seq = 0), clock())
-                            store.setHeld(change.kind, key, ChangeRules.Held(change.at, change.changeId, decision.value))
+                            store.setHeld(
+                                change.kind,
+                                key,
+                                ChangeRules.Held(change.at, change.changeId, decision.value),
+                            )
                         }
                         applied++
                     } else {
@@ -130,7 +138,11 @@ class ChangeJournal(
         val oldest = store.oldestSeq() ?: (last + 1)
         val from = after ?: 0
         // Dropped entries the caller never had, or a cursor from before this journal was reset
-        if (from < store.prunedThrough() || from > last) return Served.TooOld(oldest.coerceAtMost(last).coerceAtLeast(0))
+        if (from < store.prunedThrough() ||
+            from > last
+        ) {
+            return Served.TooOld(oldest.coerceAtMost(last).coerceAtLeast(0))
+        }
 
         val rows = store.rows(from, limit)
         val next = rows.lastOrNull()?.seq ?: from
@@ -144,9 +156,12 @@ class ChangeJournal(
         )
     }
 
-    /** Entries to push to [peer] after this device's push cursor for it, and the cursor they reach. */
+    /**
+     * Entries to push to [peer] after this device's push cursor for it, and the cursor they reach.
+     * With no cursor yet, everything journaled so far goes: nothing is journaled before the first link.
+     */
     fun toPush(peer: String, limit: Int = ChangesWire.MAX_PUSH): Pair<List<Change>, Long> {
-        val from = store.cursor(peer, PUSH) ?: store.lastSeq()
+        val from = store.cursor(peer, PUSH) ?: 0L
         val rows = store.rows(from, limit)
         return rows.filter { it.deviceId != peer } to (rows.lastOrNull()?.seq ?: from)
     }
@@ -154,6 +169,8 @@ class ChangeJournal(
     fun pullCursor(peer: String): Long? = store.cursor(peer, PULL)
 
     fun setPullCursor(peer: String, seq: Long) = store.setCursor(peer, PULL, seq)
+
+    fun pushCursor(peer: String): Long? = store.cursor(peer, PUSH)
 
     fun setPushCursor(peer: String, seq: Long) = store.setCursor(peer, PUSH, seq)
 
