@@ -44,13 +44,10 @@ class RemoteStoragePreferences(
     val username: Preference<String> = preferenceStore.getString("remote_storage_username", "")
 
     /**
-     * Stored via [Preference.privateKey] so it is excluded from backups and from
-     * the settings export, the same treatment tracker passwords get.
+     * A private key, so it stays out of ordinary backups, and [PASSWORD_KEY] is also left out when
+     * "Include sensitive settings" is ticked: a backup carries it only sealed under a passphrase.
      */
-    val password: Preference<String> = preferenceStore.getString(
-        Preference.privateKey("remote_storage_password"),
-        "",
-    )
+    val password: Preference<String> = preferenceStore.getString(PASSWORD_KEY, "")
 
     /**
      * Free local space by deleting the local copy of a chapter the server has
@@ -150,6 +147,10 @@ class RemoteStoragePreferences(
         port.set(if (parsed.port == HttpUrl.defaultPort(parsed.scheme)) "" else parsed.port.toString())
         folder.set(parsed.pathSegments.filter { it.isNotEmpty() }.joinToString("/"))
         legacyUrl.delete()
+    }
+
+    companion object {
+        val PASSWORD_KEY = Preference.privateKey("remote_storage_password")
     }
 }
 
