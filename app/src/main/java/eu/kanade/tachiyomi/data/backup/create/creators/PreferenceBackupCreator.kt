@@ -12,6 +12,7 @@ import eu.kanade.tachiyomi.data.backup.models.StringSetPreferenceValue
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.preferenceKey
 import eu.kanade.tachiyomi.source.sourcePreferences
+import mihon.data.remote.RemoteStoragePreferences
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.domain.source.service.SourceManager
@@ -43,7 +44,7 @@ class PreferenceBackupCreator(
     @Suppress("UNCHECKED_CAST")
     private fun Map<String, *>.toBackupPreferences(): List<BackupPreference> {
         return this
-            .filterKeys { !Preference.isAppState(it) }
+            .filterKeys { !Preference.isAppState(it) && it !in NEVER_IN_PREFERENCES }
             .mapNotNull { (key, value) ->
                 when (value) {
                     is Int -> BackupPreference(key, IntPreferenceValue(value))
@@ -57,6 +58,14 @@ class PreferenceBackupCreator(
                     else -> null
                 }
             }
+    }
+
+    private companion object {
+        /**
+         * Fork: the NAS password travels only sealed under a passphrase, in the backup's remote storage section.
+         * "Include sensitive settings" would otherwise put it here in plain text and undo that.
+         */
+        val NEVER_IN_PREFERENCES = setOf(RemoteStoragePreferences.PASSWORD_KEY)
     }
 
     private fun List<BackupPreference>.withPrivatePreferences(include: Boolean) =
