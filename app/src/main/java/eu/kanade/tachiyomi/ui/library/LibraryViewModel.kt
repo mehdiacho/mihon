@@ -104,6 +104,7 @@ class LibraryViewModel(
     private val downloadManager: DownloadManager,
     private val downloadCache: DownloadCache,
     private val trackerManager: TrackerManager,
+    private val coverBlurRules: CoverBlurRules,
 ) : ViewModel() {
 
     private val subscriberGate = SubscriberGate()
@@ -120,6 +121,7 @@ class LibraryViewModel(
         libraryPreferences.categoryTabs.changes(),
         libraryPreferences.categoryNumberOfItems.changes(),
         libraryPreferences.showContinueReadingButton.changes(),
+        libraryPreferences.blurAdultCovers.changes(),
         ::DisplayPreferences,
     )
 
@@ -205,6 +207,7 @@ class LibraryViewModel(
             showCategoryTabs = display.showCategoryTabs,
             showMangaCount = display.showMangaCount,
             showMangaContinueButton = display.showMangaContinueButton,
+            coverBlurEnabled = display.coverBlurEnabled,
             dialog = dialog,
             libraryData = library?.data ?: LibraryData(),
             activeCategoryIndex = activeCategoryIndex,
@@ -217,6 +220,7 @@ class LibraryViewModel(
         val showCategoryTabs: Boolean,
         val showMangaCount: Boolean,
         val showMangaContinueButton: Boolean,
+        val coverBlurEnabled: Boolean,
     )
 
     private data class Library(
@@ -412,9 +416,7 @@ class LibraryViewModel(
             libraryPreferences.filterCompleted.changes(),
             libraryPreferences.filterIntervalCustom.changes(),
 
-            libraryPreferences.blurAdultCovers.changes(),
-            libraryPreferences.coverBlurForced.changes(),
-            libraryPreferences.coverBlurExempt.changes(),
+            coverBlurRules.rules,
         ) {
             ItemPreferences(
                 downloadBadge = it[0] as Boolean,
@@ -431,9 +433,7 @@ class LibraryViewModel(
                 filterBookmarked = it[11] as TriState,
                 filterCompleted = it[12] as TriState,
                 filterIntervalCustom = it[13] as TriState,
-                blurAdultCovers = it[14] as Boolean,
-                coverBlurForced = (it[15] as Set<*>).filterIsInstance<String>().toSet(),
-                coverBlurExempt = (it[16] as Set<*>).filterIsInstance<String>().toSet(),
+                coverBlur = it[14] as CoverBlur.Rules,
             )
         }
     }
@@ -495,12 +495,10 @@ class LibraryViewModel(
                             ""
                         },
                     ),
-                    blurCover = CoverBlur.shouldBlur(
-                        enabled = preferences.blurAdultCovers,
+                    blurCover = preferences.coverBlur.shouldBlur(
                         mangaId = manga.id,
+                        sourceId = manga.manga.source,
                         genres = manga.manga.genre,
-                        forced = preferences.coverBlurForced,
-                        exempt = preferences.coverBlurExempt,
                     ),
                 )
             }
@@ -689,6 +687,12 @@ class LibraryViewModel(
             return selection.value.mapNotNull { favoritesById[it]?.libraryManga?.manga }
         }
 
+    /** Blurs or unblurs the selected series' covers by hand, then ends the selection. */
+    fun setSelectionCoverBlurred(blur: Boolean) {
+        coverBlurRules.setManga(state.value.selection, blur)
+        clearSelection()
+    }
+
     fun clearSelection() {
         lastSelection = null
         selection.update { setOf() }
@@ -829,9 +833,7 @@ class LibraryViewModel(
         val filterCompleted: TriState,
         val filterIntervalCustom: TriState,
 
-        val blurAdultCovers: Boolean,
-        val coverBlurForced: Set<String>,
-        val coverBlurExempt: Set<String>,
+        val coverBlur: CoverBlur.Rules,
     )
 
     @Immutable
@@ -856,6 +858,7 @@ class LibraryViewModel(
         val showCategoryTabs: Boolean = false,
         val showMangaCount: Boolean = false,
         val showMangaContinueButton: Boolean = false,
+        val coverBlurEnabled: Boolean = false,
         val dialog: Dialog? = null,
         val libraryData: LibraryData = LibraryData(),
         private val activeCategoryIndex: Int = 0,

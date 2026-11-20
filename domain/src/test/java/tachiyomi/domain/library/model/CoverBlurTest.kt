@@ -8,6 +8,8 @@ import org.junit.jupiter.api.parallel.ExecutionMode
 @Execution(ExecutionMode.CONCURRENT)
 class CoverBlurTest {
 
+    private val on = CoverBlur.Rules(enabled = true)
+
     @Test
     fun `adult genres are recognised regardless of case and spacing`() {
         CoverBlur.isAdult(listOf("Action", " Hentai ")) shouldBe true
@@ -18,19 +20,42 @@ class CoverBlurTest {
 
     @Test
     fun `nothing is blurred when the toggle is off`() {
-        CoverBlur.shouldBlur(false, 1, listOf("Adult"), setOf("1"), emptySet()) shouldBe false
+        val rules = CoverBlur.Rules(
+            enabled = false,
+            forced = setOf("1"),
+            sourcesForced = setOf("9"),
+            nsfwSourceIds = setOf(9),
+        )
+        rules.shouldBlur(1, 9, listOf("Adult")) shouldBe false
+        rules.sourceBlurred(9) shouldBe null
     }
 
     @Test
-    fun `overrides beat the genre rule`() {
-        CoverBlur.shouldBlur(true, 1, listOf("Comedy"), setOf("1"), emptySet()) shouldBe true
-        CoverBlur.shouldBlur(true, 2, listOf("Adult"), emptySet(), setOf("2")) shouldBe false
-        CoverBlur.shouldBlur(true, 3, listOf("Adult"), emptySet(), emptySet()) shouldBe true
+    fun `an nsfw source blurs a series with no adult tags`() {
+        val rules = on.copy(nsfwSourceIds = setOf(9))
+        rules.shouldBlur(1, 9, listOf("Romance")) shouldBe true
+        rules.shouldBlur(1, 9, null) shouldBe true
+        rules.shouldBlur(1, 8, listOf("Romance")) shouldBe false
+        rules.shouldBlur(1, 8, listOf("Adult")) shouldBe true
     }
 
     @Test
-    fun `choosing a state moves the id between the two sets`() {
-        CoverBlur.override(5, true, emptySet(), setOf("5")) shouldBe (setOf("5") to emptySet())
-        CoverBlur.override(5, false, setOf("5"), emptySet()) shouldBe (emptySet<String>() to setOf("5"))
+    fun `a source set by hand beats the automatic rule`() {
+        on.copy(nsfwSourceIds = setOf(9), sourcesExempt = setOf("9")).shouldBlur(1, 9, listOf("Adult")) shouldBe false
+        on.copy(sourcesForced = setOf("8")).shouldBlur(1, 8, listOf("Comedy")) shouldBe true
+        on.copy(sourcesForced = setOf("8")).sourceBlurred(8) shouldBe true
+        on.copy(nsfwSourceIds = setOf(9), sourcesExempt = setOf("9")).sourceBlurred(9) shouldBe false
+    }
+
+    @Test
+    fun `a series set by hand beats its source`() {
+        on.copy(sourcesExempt = setOf("9"), forced = setOf("1")).shouldBlur(1, 9, null) shouldBe true
+        on.copy(sourcesForced = setOf("9"), exempt = setOf("1")).shouldBlur(1, 9, null) shouldBe false
+    }
+
+    @Test
+    fun `choosing a state moves the ids between the two sets`() {
+        CoverBlur.override(listOf(5, 6), true, emptySet(), setOf("5")) shouldBe (setOf("5", "6") to emptySet())
+        CoverBlur.override(listOf(5), false, setOf("5", "6"), emptySet()) shouldBe (setOf("6") to setOf("5"))
     }
 }

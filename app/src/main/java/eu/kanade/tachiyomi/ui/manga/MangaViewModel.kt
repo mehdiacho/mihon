@@ -44,6 +44,7 @@ import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.data.track.EnhancedTracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.source.Source
+import eu.kanade.tachiyomi.ui.library.CoverBlurRules
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.chapter.getNextUnread
 import eu.kanade.tachiyomi.util.removeCovers
@@ -65,6 +66,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -96,7 +98,6 @@ import tachiyomi.domain.chapter.model.NoChaptersException
 import tachiyomi.domain.chapter.service.calculateChapterGap
 import tachiyomi.domain.chapter.service.getChapterSort
 import tachiyomi.domain.chapter.service.missingChaptersCount
-import tachiyomi.domain.library.model.CoverBlur
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.manga.interactor.GetDuplicateLibraryManga
 import tachiyomi.domain.manga.interactor.GetMangaWithChapters
@@ -145,6 +146,7 @@ class MangaViewModel(
     private val sourceManager: SourceManager,
     private val refreshTracks: RefreshTracks,
     private val coverCache: CoverCache,
+    private val coverBlurRules: CoverBlurRules,
 ) : ViewModel() {
 
     private val subscriberGate = SubscriberGate()
@@ -180,28 +182,11 @@ class MangaViewModel(
      * Whether [manga]'s cover is blurred in the library, or null while the privacy blur is
      * switched off (then there is nothing to toggle).
      */
-    fun coverBlurred(manga: Manga): Flow<Boolean?> = combine(
-        libraryPreferences.blurAdultCovers.changes(),
-        libraryPreferences.coverBlurForced.changes(),
-        libraryPreferences.coverBlurExempt.changes(),
-    ) { enabled, forced, exempt ->
-        if (!enabled) {
-            null
-        } else {
-            CoverBlur.shouldBlur(true, manga.id, manga.genre, forced, exempt)
-        }
+    fun coverBlurred(manga: Manga): Flow<Boolean?> = coverBlurRules.rules.map { rules ->
+        rules.takeIf { it.enabled }?.shouldBlur(manga.id, manga.source, manga.genre)
     }
 
-    fun setCoverBlurred(manga: Manga, blur: Boolean) {
-        val (forced, exempt) = CoverBlur.override(
-            mangaId = manga.id,
-            blur = blur,
-            forced = libraryPreferences.coverBlurForced.get(),
-            exempt = libraryPreferences.coverBlurExempt.get(),
-        )
-        libraryPreferences.coverBlurForced.set(forced)
-        libraryPreferences.coverBlurExempt.set(exempt)
-    }
+    fun setCoverBlurred(manga: Manga, blur: Boolean) = coverBlurRules.setManga(listOf(manga.id), blur)
 
     val chapterSwipeStartAction = libraryPreferences.swipeToEndAction.get()
     val chapterSwipeEndAction = libraryPreferences.swipeToStartAction.get()

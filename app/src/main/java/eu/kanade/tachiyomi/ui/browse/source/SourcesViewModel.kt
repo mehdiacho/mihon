@@ -12,8 +12,10 @@ import eu.kanade.domain.source.interactor.GetEnabledSources
 import eu.kanade.domain.source.interactor.ToggleSource
 import eu.kanade.domain.source.interactor.ToggleSourcePin
 import eu.kanade.presentation.browse.SourceUiModel
+import eu.kanade.tachiyomi.ui.library.CoverBlurRules
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -39,7 +41,13 @@ class SourcesViewModel(
     private val getEnabledSources: GetEnabledSources,
     private val toggleSource: ToggleSource,
     private val toggleSourcePin: ToggleSourcePin,
+    private val coverBlurRules: CoverBlurRules,
 ) : ViewModel() {
+
+    /** Whether [source]'s library covers are blurred, or null while the privacy blur is off. */
+    fun coverBlurred(source: Source): Flow<Boolean?> = coverBlurRules.rules.map { it.sourceBlurred(source.id) }
+
+    fun setCoverBlurred(source: Source, blur: Boolean) = coverBlurRules.setSource(source.id, blur)
 
     private val _events = Channel<Event>(Int.MAX_VALUE)
     val events = _events.receiveAsFlow()

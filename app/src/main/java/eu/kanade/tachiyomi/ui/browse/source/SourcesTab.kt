@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.ui.browse.source
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -55,8 +56,16 @@ fun Screen.sourcesTab(): TabContent {
 
             state.dialog?.let { dialog ->
                 val source = dialog.source
+                val coverBlurred by remember(source.id) {
+                    viewModel.coverBlurred(source)
+                }.collectAsStateWithLifecycle(null)
                 SourceOptionsDialog(
                     source = source,
+                    coverBlurred = coverBlurred,
+                    onClickCoverBlur = { blur ->
+                        viewModel.setCoverBlurred(source, blur)
+                        viewModel.closeDialog()
+                    },
                     onClickPin = {
                         viewModel.togglePin(source)
                         viewModel.closeDialog()

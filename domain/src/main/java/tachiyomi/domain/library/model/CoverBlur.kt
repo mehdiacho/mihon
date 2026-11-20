@@ -3,9 +3,12 @@ package tachiyomi.domain.library.model
 /**
  * Decides which library covers are blurred for privacy.
  *
- * A series counts as 18+ when one of its genres is in [ADULT_GENRES]. Each series can be
- * overridden by hand: [forced] ids are always blurred and [exempt] ids never are. When the
- * global toggle is off, nothing is blurred, overrides included.
+ * In order, the first that applies wins:
+ * 1. the global toggle is off: nothing is blurred;
+ * 2. the series was set by hand ([Rules.forced] / [Rules.exempt]);
+ * 3. its source was set by hand ([Rules.sourcesForced] / [Rules.sourcesExempt]);
+ * 4. its source is rated NSFW, or one of its genres is in [ADULT_GENRES]. Many adult series
+ *    carry no such tag, so the source rating matters most.
  */
 object CoverBlur {
 
@@ -27,30 +30,46 @@ object CoverBlur {
     fun isAdult(genres: List<String>?): Boolean =
         genres.orEmpty().any { it.trim().lowercase() in ADULT_GENRES }
 
-    fun shouldBlur(
-        enabled: Boolean,
-        mangaId: Long,
-        genres: List<String>?,
-        forced: Set<String>,
-        exempt: Set<String>,
-    ): Boolean {
-        if (!enabled) return false
-        val id = mangaId.toString()
-        return when (id) {
-            in forced -> true
-            in exempt -> false
-            else -> isAdult(genres)
+    data class Rules(
+        val enabled: Boolean = false,
+        val forced: Set<String> = emptySet(),
+        val exempt: Set<String> = emptySet(),
+        val sourcesForced: Set<String> = emptySet(),
+        val sourcesExempt: Set<String> = emptySet(),
+        val nsfwSourceIds: Set<Long> = emptySet(),
+    ) {
+        /** Whether a source's series are blurred unless set by hand; null while the toggle is off. */
+        fun sourceBlurred(sourceId: Long): Boolean? {
+            if (!enabled) return null
+            return when (sourceId.toString()) {
+                in sourcesForced -> true
+                in sourcesExempt -> false
+                else -> sourceId in nsfwSourceIds
+            }
+        }
+
+        fun shouldBlur(mangaId: Long, sourceId: Long, genres: List<String>?): Boolean {
+            if (!enabled) return false
+            when (mangaId.toString()) {
+                in forced -> return true
+                in exempt -> return false
+            }
+            when (sourceId.toString()) {
+                in sourcesForced -> return true
+                in sourcesExempt -> return false
+            }
+            return sourceId in nsfwSourceIds || isAdult(genres)
         }
     }
 
-    /** The override sets after choosing [blur] for one series, as (forced, exempt). */
+    /** The (forced, exempt) sets after choosing [blur] for every id in [ids]. */
     fun override(
-        mangaId: Long,
+        ids: Collection<Long>,
         blur: Boolean,
         forced: Set<String>,
         exempt: Set<String>,
     ): Pair<Set<String>, Set<String>> {
-        val id = mangaId.toString()
-        return if (blur) (forced + id) to (exempt - id) else (forced - id) to (exempt + id)
+        val keys = ids.map(Long::toString).toSet()
+        return if (blur) (forced + keys) to (exempt - keys) else (forced - keys) to (exempt + keys)
     }
 }

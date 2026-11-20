@@ -133,6 +133,10 @@
     <string name="action_blur_cover">Blur cover in library</string>
     <string name="action_unblur_cover">Unblur cover in library</string>
     <string name="cover_blurred">Cover hidden</string>
+    <string name="action_blur_covers">Blur covers</string>
+    <string name="action_unblur_covers">Unblur covers</string>
+    <string name="action_blur_source_covers">Blur covers from this source</string>
+    <string name="action_unblur_source_covers">Unblur covers from this source</string>
     <string name="action_disable">Disable</string>
     <string name="action_pin">Pin</string>
     <string name="action_unpin">Unpin</string>
