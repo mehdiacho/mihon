@@ -44,6 +44,7 @@ import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.data.track.EnhancedTracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.source.Source
+import eu.kanade.tachiyomi.ui.library.CoverBlurRules
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.chapter.getNextUnread
 import eu.kanade.tachiyomi.util.removeCovers
@@ -51,6 +52,7 @@ import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -64,6 +66,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -143,6 +146,7 @@ class MangaViewModel(
     private val sourceManager: SourceManager,
     private val refreshTracks: RefreshTracks,
     private val coverCache: CoverCache,
+    private val coverBlurRules: CoverBlurRules,
 ) : ViewModel() {
 
     private val subscriberGate = SubscriberGate()
@@ -173,6 +177,16 @@ class MangaViewModel(
 
     private val filteredChapters: List<ChapterList.Item>?
         get() = successState?.processedChapters
+
+    /**
+     * Whether [manga]'s cover is blurred in the library, or null while the privacy blur is
+     * switched off (then there is nothing to toggle).
+     */
+    fun coverBlurred(manga: Manga): Flow<Boolean?> = coverBlurRules.rules.map { rules ->
+        rules.takeIf { it.enabled }?.shouldBlur(manga.id, manga.source, manga.genre)
+    }
+
+    fun setCoverBlurred(manga: Manga, blur: Boolean) = coverBlurRules.setManga(listOf(manga.id), blur)
 
     val chapterSwipeStartAction = libraryPreferences.swipeToEndAction.get()
     val chapterSwipeEndAction = libraryPreferences.swipeToStartAction.get()

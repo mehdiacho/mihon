@@ -105,6 +105,10 @@ class MangaScreen(
             }
         }
 
+        val coverBlurred by remember(successState.manga.id, successState.manga.genre) {
+            viewModel.coverBlurred(successState.manga)
+        }.collectAsStateWithLifecycle(null)
+
         MangaScreen(
             state = successState,
             snackbarHostState = viewModel.snackbarHostState,
@@ -161,6 +165,8 @@ class MangaScreen(
                 navigator.push(MigrationConfigScreen(successState.manga.id))
             }.takeIf { successState.manga.favorite },
             onEditNotesClicked = { navigator.push(MangaNotesScreen(manga = successState.manga)) },
+            coverBlurred = coverBlurred,
+            onToggleCoverBlur = { blur -> viewModel.setCoverBlurred(successState.manga, blur) },
             onMultiBookmarkClicked = viewModel::bookmarkChapters,
             onMultiMarkAsReadClicked = viewModel::markChaptersRead,
             onMarkPreviousAsReadClicked = viewModel::markPreviousChapterRead,

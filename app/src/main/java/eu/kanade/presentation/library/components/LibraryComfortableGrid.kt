@@ -35,6 +35,7 @@ internal fun LibraryComfortableGrid(
             val manga = libraryItem.libraryManga.manga
             MangaComfortableGridItem(
                 isSelected = manga.id in selection,
+                blurCover = libraryItem.blurCover,
                 title = manga.title,
                 coverData = MangaCover(
                     mangaId = manga.id,

@@ -120,6 +120,7 @@ data object LibraryTab : Tab {
                     onClickUnselectAll = viewModel::clearSelection,
                     onClickSelectAll = viewModel::selectAll,
                     onClickInvertSelection = viewModel::invertSelection,
+                    onClickCoverBlur = viewModel::setSelectionCoverBlurred.takeIf { state.coverBlurEnabled },
                     onClickFilter = viewModel::showSettingsDialog,
                     onClickRefresh = { scope.launch { onClickRefresh(state.activeCategory) } },
                     onClickGlobalUpdate = { scope.launch { onClickRefresh(null) } },

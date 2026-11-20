@@ -12,6 +12,8 @@ data class LibraryItem(
     val sourceName: String,
     val sourceLanguage: String,
     val badges: Badges,
+    /** Blur this cover for privacy. See [tachiyomi.domain.library.model.CoverBlur]. */
+    val blurCover: Boolean = false,
 ) {
     val id: Long = libraryManga.id
 

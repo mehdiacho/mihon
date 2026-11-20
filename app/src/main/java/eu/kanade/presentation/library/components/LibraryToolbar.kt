@@ -39,12 +39,15 @@ fun LibraryToolbar(
     searchQuery: String?,
     onSearchQueryChange: (String?) -> Unit,
     scrollBehavior: TopAppBarScrollBehavior?,
+    /** Blur or unblur the selected covers; null while the privacy blur is off. */
+    onClickCoverBlur: ((Boolean) -> Unit)? = null,
 ) = when {
     selectedCount > 0 -> LibrarySelectionToolbar(
         selectedCount = selectedCount,
         onClickUnselectAll = onClickUnselectAll,
         onClickSelectAll = onClickSelectAll,
         onClickInvertSelection = onClickInvertSelection,
+        onClickCoverBlur = onClickCoverBlur,
     )
     else -> LibraryRegularToolbar(
         title = title,
@@ -127,12 +130,13 @@ private fun LibrarySelectionToolbar(
     onClickUnselectAll: () -> Unit,
     onClickSelectAll: () -> Unit,
     onClickInvertSelection: () -> Unit,
+    onClickCoverBlur: ((Boolean) -> Unit)?,
 ) {
     AppBar(
         titleContent = { Text(text = "$selectedCount") },
         actions = {
             AppBarActions(
-                listOf(
+                listOfNotNull(
                     AppBar.Action(
                         title = stringResource(MR.strings.action_select_all),
                         icon = MaterialSymbols.Rounded.SelectAll,
@@ -143,6 +147,18 @@ private fun LibrarySelectionToolbar(
                         icon = MaterialSymbols.Rounded.FlipToBack,
                         onClick = onClickInvertSelection,
                     ),
+                    onClickCoverBlur?.let {
+                        AppBar.OverflowAction(
+                            title = stringResource(MR.strings.action_blur_covers),
+                            onClick = { it(true) },
+                        )
+                    },
+                    onClickCoverBlur?.let {
+                        AppBar.OverflowAction(
+                            title = stringResource(MR.strings.action_unblur_covers),
+                            onClick = { it(false) },
+                        )
+                    },
                 ),
             )
         },

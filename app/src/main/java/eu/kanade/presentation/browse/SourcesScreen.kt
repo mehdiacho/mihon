@@ -167,6 +167,9 @@ fun SourceOptionsDialog(
     onClickPin: () -> Unit,
     onClickDisable: () -> Unit,
     onDismiss: () -> Unit,
+    /** Whether this source's library covers are blurred; null hides the option. */
+    coverBlurred: Boolean? = null,
+    onClickCoverBlur: (Boolean) -> Unit = {},
 ) {
     AlertDialog(
         title = {
@@ -182,6 +185,19 @@ fun SourceOptionsDialog(
                         .fillMaxWidth()
                         .padding(vertical = 16.dp),
                 )
+                if (coverBlurred != null) {
+                    Text(
+                        text = if (coverBlurred) {
+                            stringResource(MR.strings.action_unblur_source_covers)
+                        } else {
+                            stringResource(MR.strings.action_blur_source_covers)
+                        },
+                        modifier = Modifier
+                            .clickable { onClickCoverBlur(!coverBlurred) }
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                    )
+                }
                 if (!source.isLocal()) {
                     Text(
                         text = stringResource(MR.strings.action_disable),

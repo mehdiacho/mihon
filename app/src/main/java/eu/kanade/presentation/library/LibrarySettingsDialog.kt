@@ -302,6 +302,12 @@ private fun ColumnScope.DisplayPage(
         pref = viewModel.libraryPreferences.showContinueReadingButton,
     )
 
+    HeadingItem(MR.strings.privacy_header)
+    CheckboxItem(
+        label = stringResource(MR.strings.action_display_blur_adult_covers),
+        pref = viewModel.libraryPreferences.blurAdultCovers,
+    )
+
     HeadingItem(MR.strings.tabs_header)
     CheckboxItem(
         label = stringResource(MR.strings.action_display_show_tabs),

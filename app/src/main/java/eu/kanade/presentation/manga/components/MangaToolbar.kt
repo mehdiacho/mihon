@@ -37,6 +37,9 @@ fun MangaToolbar(
     onClickRefresh: () -> Unit,
     onClickMigrate: (() -> Unit)?,
     onClickEditNotes: () -> Unit,
+    /** Whether the cover is blurred in the library; null hides the menu item. */
+    coverBlurred: Boolean?,
+    onToggleCoverBlur: (Boolean) -> Unit,
 
     // For action mode
     actionModeCounter: Int,
@@ -146,6 +149,16 @@ fun MangaToolbar(
                             onClick = onClickEditNotes,
                         ),
                     )
+                    if (coverBlurred != null) {
+                        add(
+                            AppBar.OverflowAction(
+                                title = stringResource(
+                                    if (coverBlurred) MR.strings.action_unblur_cover else MR.strings.action_blur_cover,
+                                ),
+                                onClick = { onToggleCoverBlur(!coverBlurred) },
+                            ),
+                        )
+                    }
                 },
             )
         },
