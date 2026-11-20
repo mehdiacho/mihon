@@ -64,6 +64,7 @@ import tachiyomi.domain.chapter.interactor.GetBookmarkedChaptersByMangaId
 import tachiyomi.domain.chapter.interactor.GetChaptersByMangaId
 import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.history.interactor.GetNextChapters
+import tachiyomi.domain.library.model.CoverBlur
 import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.domain.library.model.LibraryManga
 import tachiyomi.domain.library.model.LibrarySort
@@ -410,6 +411,10 @@ class LibraryViewModel(
             libraryPreferences.filterBookmarked.changes(),
             libraryPreferences.filterCompleted.changes(),
             libraryPreferences.filterIntervalCustom.changes(),
+
+            libraryPreferences.blurAdultCovers.changes(),
+            libraryPreferences.coverBlurForced.changes(),
+            libraryPreferences.coverBlurExempt.changes(),
         ) {
             ItemPreferences(
                 downloadBadge = it[0] as Boolean,
@@ -426,6 +431,9 @@ class LibraryViewModel(
                 filterBookmarked = it[11] as TriState,
                 filterCompleted = it[12] as TriState,
                 filterIntervalCustom = it[13] as TriState,
+                blurAdultCovers = it[14] as Boolean,
+                coverBlurForced = (it[15] as Set<*>).filterIsInstance<String>().toSet(),
+                coverBlurExempt = (it[16] as Set<*>).filterIsInstance<String>().toSet(),
             )
         }
     }
@@ -486,6 +494,13 @@ class LibraryViewModel(
                         } else {
                             ""
                         },
+                    ),
+                    blurCover = CoverBlur.shouldBlur(
+                        enabled = preferences.blurAdultCovers,
+                        mangaId = manga.id,
+                        genres = manga.manga.genre,
+                        forced = preferences.coverBlurForced,
+                        exempt = preferences.coverBlurExempt,
                     ),
                 )
             }
@@ -813,6 +828,10 @@ class LibraryViewModel(
         val filterBookmarked: TriState,
         val filterCompleted: TriState,
         val filterIntervalCustom: TriState,
+
+        val blurAdultCovers: Boolean,
+        val coverBlurForced: Set<String>,
+        val coverBlurExempt: Set<String>,
     )
 
     @Immutable

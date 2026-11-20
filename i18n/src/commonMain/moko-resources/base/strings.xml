@@ -128,6 +128,11 @@
     <string name="action_display_show_tabs">Show category tabs</string>
     <string name="action_display_show_number_of_items">Show number of items</string>
     <string name="action_display_show_continue_reading_button">Continue reading button</string>
+    <string name="privacy_header">Privacy</string>
+    <string name="action_display_blur_adult_covers">Blur 18+ covers</string>
+    <string name="action_blur_cover">Blur cover in library</string>
+    <string name="action_unblur_cover">Unblur cover in library</string>
+    <string name="cover_blurred">Cover hidden</string>
     <string name="action_disable">Disable</string>
     <string name="action_pin">Pin</string>
     <string name="action_unpin">Unpin</string>

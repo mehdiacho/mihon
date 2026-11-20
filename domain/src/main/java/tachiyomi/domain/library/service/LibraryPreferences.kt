@@ -66,6 +66,15 @@ class LibraryPreferences(
         false,
     )
 
+    /** Blur the covers of 18+ series in the library. See [tachiyomi.domain.library.model.CoverBlur]. */
+    val blurAdultCovers: Preference<Boolean> = preferenceStore.getBoolean("library_blur_adult_covers", true)
+
+    /** Manga ids whose cover is always blurred. */
+    val coverBlurForced: Preference<Set<String>> = preferenceStore.getStringSet("library_cover_blur_forced", emptySet())
+
+    /** Manga ids whose cover is never blurred. */
+    val coverBlurExempt: Preference<Set<String>> = preferenceStore.getStringSet("library_cover_blur_exempt", emptySet())
+
     val markDuplicateReadChapterAsRead: Preference<Set<String>> = preferenceStore.getStringSet(
         "mark_duplicate_read_chapter_read",
         emptySet(),

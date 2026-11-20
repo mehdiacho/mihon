@@ -1,5 +1,6 @@
 package eu.kanade.presentation.library.components
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -26,8 +27,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -39,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import eu.kanade.presentation.manga.components.MangaCover
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.roundedfilled.PlayArrow
+import mihon.icons.materialsymbols.roundedfilled.VisibilityOff
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.BadgeGroup
 import tachiyomi.presentation.core.i18n.stringResource
@@ -77,6 +81,7 @@ fun MangaCompactGridItem(
     title: String? = null,
     onClickContinueReading: (() -> Unit)? = null,
     coverAlpha: Float = 1f,
+    blurCover: Boolean = false,
     coverBadgeStart: @Composable (RowScope.() -> Unit)? = null,
     coverBadgeEnd: @Composable (RowScope.() -> Unit)? = null,
 ) {
@@ -90,9 +95,11 @@ fun MangaCompactGridItem(
                 MangaCover.Book(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha),
+                        .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha)
+                        .privacyBlur(blurCover),
                     data = coverData,
                 )
+                if (blurCover) BlurredCoverMark(Modifier.align(Alignment.Center))
             },
             badgesStart = coverBadgeStart,
             badgesEnd = coverBadgeEnd,
@@ -182,6 +189,7 @@ fun MangaComfortableGridItem(
     isSelected: Boolean = false,
     titleMaxLines: Int = 2,
     coverAlpha: Float = 1f,
+    blurCover: Boolean = false,
     coverBadgeStart: (@Composable RowScope.() -> Unit)? = null,
     coverBadgeEnd: (@Composable RowScope.() -> Unit)? = null,
     onClickContinueReading: (() -> Unit)? = null,
@@ -197,9 +205,11 @@ fun MangaComfortableGridItem(
                     MangaCover.Book(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha),
+                            .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha)
+                            .privacyBlur(blurCover),
                         data = coverData,
                     )
+                    if (blurCover) BlurredCoverMark(Modifier.align(Alignment.Center))
                 },
                 badgesStart = coverBadgeStart,
                 badgesEnd = coverBadgeEnd,
@@ -337,6 +347,7 @@ fun MangaListItem(
     badge: @Composable (RowScope.() -> Unit),
     isSelected: Boolean = false,
     coverAlpha: Float = 1f,
+    blurCover: Boolean = false,
     onClickContinueReading: (() -> Unit)? = null,
 ) {
     Row(
@@ -353,7 +364,8 @@ fun MangaListItem(
         MangaCover.Square(
             modifier = Modifier
                 .fillMaxHeight()
-                .alpha(coverAlpha),
+                .alpha(coverAlpha)
+                .privacyBlur(blurCover),
             data = coverData,
         )
         Text(
@@ -401,4 +413,34 @@ private fun ContinueReadingButton(
             )
         }
     }
+}
+
+private val PrivacyBlurRadius = 20.dp
+
+/**
+ * Hides a cover for privacy. Real blur needs Android 12; older versions get an opaque scrim.
+ */
+private fun Modifier.privacyBlur(enabled: Boolean): Modifier = when {
+    !enabled -> this
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+        this
+            .blur(PrivacyBlurRadius)
+            .drawWithContent {
+                drawContent()
+                drawRect(Color(0x33000000))
+            }
+    else -> drawWithContent {
+        drawContent()
+        drawRect(Color(0xF0303030))
+    }
+}
+
+@Composable
+private fun BlurredCoverMark(modifier: Modifier = Modifier) {
+    Icon(
+        imageVector = MaterialSymbols.RoundedFilled.VisibilityOff,
+        contentDescription = stringResource(MR.strings.cover_blurred),
+        tint = Color.White.copy(alpha = 0.85f),
+        modifier = modifier.size(28.dp),
+    )
 }
